@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#2563eb" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  <!-- Rounded square background -->
+  <rect x="10" y="10" width="180" height="180" rx="40" fill="url(#bg)" filter="url(#shadow)"/>
+  <rect x="10" y="10" width="180" height="180" rx="40" fill="url(#shine)"/>
+  <!-- Book icon -->
+  <path d="M55 60 C55 55, 60 50, 65 50 L100 50 L100 145 L65 145 C60 145, 55 140, 55 135 Z" fill="white" opacity="0.95"/>
+  <path d="M100 50 L135 50 C140 50, 145 55, 145 60 L145 135 C145 140, 140 145, 135 145 Z" fill="white" opacity="0.85"/>
+  <!-- Book spine -->
+  <line x1="100" y1="50" x2="100" y2="145" stroke="#2563eb" stroke-width="2.5" opacity="0.3"/>
+  <!-- Lines on left page -->
+  <line x1="65" y1="70" x2="92" y2="70" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
+  <line x1="65" y1="82" x2="92" y2="82" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="65" y1="94" x2="88" y2="94" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="65" y1="106" x2="92" y2="106" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
+  <line x1="65" y1="118" x2="85" y2="118" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" opacity="0.3"/>
+  <!-- Lines on right page -->
+  <line x1="108" y1="70" x2="135" y2="70" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
+  <line x1="108" y1="82" x2="135" y2="82" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="108" y1="94" x2="132" y2="94" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" opacity="0.3"/>
+  <line x1="108" y1="106" x2="135" y2="106" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" opacity="0.4"/>
+  <!-- Question mark accent -->
+  <circle cx="152" cy="52" r="20" fill="#facc15" opacity="0.9"/>
+  <text x="152" y="60" text-anchor="middle" font-family="Inter, system-ui, sans-serif" font-size="24" font-weight="800" fill="#1e3a8a">?</text>
+</svg>
