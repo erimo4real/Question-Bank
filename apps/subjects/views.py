@@ -8,7 +8,7 @@ from django.views import View
 from rest_framework import viewsets
 
 from apps.accounts.permissions import IsAdminOrTeacher
-from apps.schools.models import School
+from apps.schools.models import ClassLevel, School
 
 from .forms import SubjectForm, TopicCreateForm, TopicForm
 from .models import Subject, Topic
@@ -36,8 +36,11 @@ class SubjectListView(LoginRequiredMixin, View):
             subjects = request.user.subjects.filter(school=request.user.school).prefetch_related("topics").order_by("name")
 
         q = request.GET.get("q", "")
+        class_level_filter = request.GET.get("class_level", "")
         if q:
             subjects = subjects.filter(name__icontains=q)
+        if class_level_filter:
+            subjects = subjects.filter(class_level_id=class_level_filter)
 
         paginator = Paginator(subjects, 12)
         page = request.GET.get("page")
@@ -48,27 +51,30 @@ class SubjectListView(LoginRequiredMixin, View):
         except EmptyPage:
             page_obj = paginator.page(paginator.num_pages)
 
-        return render(request, "subjects/list.html", {"subjects": page_obj, "page_obj": page_obj, "q": q})
+        if request.user.is_super_admin_role:
+            class_levels = ClassLevel.objects.all()
+        else:
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
+
+        return render(request, "subjects/list.html", {
+            "subjects": page_obj, "page_obj": page_obj, "q": q,
+            "class_level_filter": class_level_filter, "class_levels": class_levels,
+        })
 
 
 class SubjectCreateView(LoginRequiredMixin, View):
     def get(self, request):
-        form = SubjectForm()
-        return render(request, "subjects/form.html", {"subject": None, "form": form})
+        school = self._get_school(request)
+        form = SubjectForm(school=school)
+        class_levels = ClassLevel.objects.filter(school=school) if school else ClassLevel.objects.all()
+        return render(request, "subjects/form.html", {"subject": None, "form": form, "class_levels": class_levels})
 
     def post(self, request):
-        form = SubjectForm(request.POST)
+        school = self._get_school(request)
+        form = SubjectForm(request.POST, school=school)
         if form.is_valid():
-            if not request.user.school and not request.user.is_super_admin_role:
-                messages.error(request, "No school assigned to your account.")
-                return render(request, "subjects/form.html", {"subject": None, "form": form})
-            school = request.user.school
-            if request.user.is_super_admin_role:
-                school_id = request.POST.get("school")
-                if school_id:
-                    school = get_object_or_404(School, pk=school_id)
             if not school:
-                messages.error(request, "Please select a school.")
+                messages.error(request, "No school assigned to your account.")
                 return render(request, "subjects/form.html", {"subject": None, "form": form})
             subject = form.save(commit=False)
             subject.school = school
@@ -78,24 +84,38 @@ class SubjectCreateView(LoginRequiredMixin, View):
             subject.save()
             messages.success(request, f'Subject "{subject.name}" created.')
             return redirect("subject-list")
-        return render(request, "subjects/form.html", {"subject": None, "form": form})
+        class_levels = ClassLevel.objects.filter(school=school) if school else ClassLevel.objects.all()
+        return render(request, "subjects/form.html", {"subject": None, "form": form, "class_levels": class_levels})
+
+    def _get_school(self, request):
+        if request.user.is_super_admin_role:
+            school_id = request.POST.get("school") or request.GET.get("school")
+            if school_id:
+                return get_object_or_404(School, pk=school_id)
+            return request.user.school
+        return request.user.school
 
 
 class SubjectEditView(LoginRequiredMixin, View):
     def get(self, request, pk):
         if request.user.is_super_admin_role:
             subject = get_object_or_404(Subject, pk=pk)
+            school = subject.school
         else:
             subject = get_object_or_404(Subject, pk=pk, school=request.user.school)
-        form = SubjectForm(instance=subject)
-        return render(request, "subjects/form.html", {"subject": subject, "form": form})
+            school = request.user.school
+        form = SubjectForm(instance=subject, school=school)
+        class_levels = ClassLevel.objects.filter(school=school) if school else ClassLevel.objects.all()
+        return render(request, "subjects/form.html", {"subject": subject, "form": form, "class_levels": class_levels})
 
     def post(self, request, pk):
         if request.user.is_super_admin_role:
             subject = get_object_or_404(Subject, pk=pk)
+            school = subject.school
         else:
             subject = get_object_or_404(Subject, pk=pk, school=request.user.school)
-        form = SubjectForm(request.POST, instance=subject)
+            school = request.user.school
+        form = SubjectForm(request.POST, instance=subject, school=school)
         if form.is_valid():
             updated = form.save(commit=False)
             if not updated.code:
@@ -103,7 +123,8 @@ class SubjectEditView(LoginRequiredMixin, View):
             updated.save()
             messages.success(request, f'Subject "{updated.name}" updated.')
             return redirect("subject-list")
-        return render(request, "subjects/form.html", {"subject": subject, "form": form})
+        class_levels = ClassLevel.objects.filter(school=school) if school else ClassLevel.objects.all()
+        return render(request, "subjects/form.html", {"subject": subject, "form": form, "class_levels": class_levels})
 
 
 class SubjectDeleteView(LoginRequiredMixin, View):
@@ -125,14 +146,14 @@ class TopicListView(LoginRequiredMixin, View):
         if request.user.is_super_admin_role:
             topics = (
                 Topic.objects.all()
-                .select_related("subject")
+                .select_related("subject", "class_level")
                 .annotate(question_count=Count("questions"))
                 .order_by("subject__name", "name")
             )
         else:
             topics = (
                 Topic.objects.filter(subject__school=request.user.school)
-                .select_related("subject")
+                .select_related("subject", "class_level")
                 .annotate(question_count=Count("questions"))
                 .order_by("subject__name", "name")
             )
@@ -141,11 +162,14 @@ class TopicListView(LoginRequiredMixin, View):
 
         q = request.GET.get("q", "")
         subject_filter = request.GET.get("subject", "")
+        class_level_filter = request.GET.get("class_level", "")
 
         if q:
             topics = topics.filter(name__icontains=q)
         if subject_filter:
             topics = topics.filter(subject_id=subject_filter)
+        if class_level_filter:
+            topics = topics.filter(class_level_id=class_level_filter)
 
         paginator = Paginator(topics, 20)
         page = request.GET.get("page")
@@ -159,13 +183,17 @@ class TopicListView(LoginRequiredMixin, View):
         from apps.subjects.models import Subject
         if request.user.is_super_admin_role:
             all_subjects = Subject.objects.all()
+            class_levels = ClassLevel.objects.all()
         elif request.user.is_school_admin_role:
             all_subjects = Subject.objects.filter(school=request.user.school)
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
         else:
             all_subjects = request.user.subjects.filter(school=request.user.school)
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
 
         return render(request, "subjects/topic_list.html", {
             "topics": page_obj, "page_obj": page_obj, "q": q, "subject_filter": subject_filter,
+            "class_level_filter": class_level_filter, "class_levels": class_levels,
             "all_subjects": all_subjects,
         })
 
@@ -174,12 +202,18 @@ class TopicCreateStandaloneView(LoginRequiredMixin, View):
     def get(self, request):
         if request.user.is_super_admin_role:
             subjects = Subject.objects.all().order_by("name")
+            class_levels = ClassLevel.objects.all()
         else:
             subjects = Subject.objects.filter(school=request.user.school).order_by("name")
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
         form = TopicCreateForm()
-        return render(request, "subjects/topic_form.html", {"topic": None, "subjects": subjects, "form": form})
+        return render(request, "subjects/topic_form.html", {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form})
 
     def post(self, request):
+        if request.user.is_super_admin_role:
+            class_levels = ClassLevel.objects.all()
+        else:
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
         form = TopicCreateForm(request.POST)
         if form.is_valid():
             subject = form.cleaned_data["subject"]
@@ -194,7 +228,7 @@ class TopicCreateStandaloneView(LoginRequiredMixin, View):
             subjects = Subject.objects.all().order_by("name")
         else:
             subjects = Subject.objects.filter(school=request.user.school).order_by("name")
-        return render(request, "subjects/topic_form.html", {"topic": None, "subjects": subjects, "form": form})
+        return render(request, "subjects/topic_form.html", {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form})
 
 
 class TopicEditView(LoginRequiredMixin, View):
@@ -202,17 +236,21 @@ class TopicEditView(LoginRequiredMixin, View):
         if request.user.is_super_admin_role:
             topic = get_object_or_404(Topic, pk=pk)
             subjects = Subject.objects.all().order_by("name")
+            class_levels = ClassLevel.objects.all()
         else:
             topic = get_object_or_404(Topic, pk=pk, subject__school=request.user.school)
             subjects = Subject.objects.filter(school=request.user.school).order_by("name")
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
         form = TopicCreateForm(instance=topic)
-        return render(request, "subjects/topic_form.html", {"topic": topic, "subjects": subjects, "form": form})
+        return render(request, "subjects/topic_form.html", {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form})
 
     def post(self, request, pk):
         if request.user.is_super_admin_role:
             topic = get_object_or_404(Topic, pk=pk)
+            class_levels = ClassLevel.objects.all()
         else:
             topic = get_object_or_404(Topic, pk=pk, subject__school=request.user.school)
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
         form = TopicCreateForm(request.POST, instance=topic)
         if form.is_valid():
             subject = form.cleaned_data["subject"]
@@ -226,7 +264,7 @@ class TopicEditView(LoginRequiredMixin, View):
             subjects = Subject.objects.all().order_by("name")
         else:
             subjects = Subject.objects.filter(school=request.user.school).order_by("name")
-        return render(request, "subjects/topic_form.html", {"topic": topic, "subjects": subjects, "form": form})
+        return render(request, "subjects/topic_form.html", {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form})
 
 
 class TopicDeleteStandaloneView(LoginRequiredMixin, View):

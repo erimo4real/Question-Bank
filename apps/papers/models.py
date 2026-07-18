@@ -19,6 +19,13 @@ class ExamPaper(models.Model):
         related_name="exam_papers",
     )
     class_name = models.CharField(max_length=100, blank=True, default="")
+    class_level = models.ForeignKey(
+        "schools.ClassLevel",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="exam_papers",
+    )
     academic_session = models.CharField(max_length=50, blank=True, default="")
     term = models.CharField(max_length=50, blank=True, default="")
     duration_minutes = models.PositiveIntegerField(default=60)

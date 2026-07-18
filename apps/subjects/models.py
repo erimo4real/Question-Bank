@@ -15,6 +15,13 @@ class Subject(models.Model):
         on_delete=models.CASCADE,
         related_name="subjects",
     )
+    class_level = models.ForeignKey(
+        "schools.ClassLevel",
+        on_delete=models.CASCADE,
+        related_name="subjects",
+        null=True,
+        blank=True,
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -48,6 +55,13 @@ class Topic(models.Model):
         Subject,
         on_delete=models.CASCADE,
         related_name="topics",
+    )
+    class_level = models.ForeignKey(
+        "schools.ClassLevel",
+        on_delete=models.CASCADE,
+        related_name="topics",
+        null=True,
+        blank=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

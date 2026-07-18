@@ -1,8 +1,12 @@
 from django import forms
 
+from apps.schools.models import ClassLevel
 from apps.subjects.models import Subject, Topic
 
 from .models import Question
+
+
+SELECT_ATTRS = "block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500/20 transition-all duration-200"
 
 
 class QuestionForm(forms.ModelForm):
@@ -17,11 +21,7 @@ class QuestionForm(forms.ModelForm):
     )
     question_type = forms.ChoiceField(
         choices=Question.TYPE_CHOICES,
-        widget=forms.Select(
-            attrs={
-                "class": "block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500/20 transition-all duration-200",
-            }
-        ),
+        widget=forms.Select(attrs={"class": SELECT_ATTRS}),
     )
     explanation = forms.CharField(
         required=False,
@@ -38,37 +38,31 @@ class QuestionForm(forms.ModelForm):
         initial=1,
         widget=forms.NumberInput(
             attrs={
-                "class": "block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500/20 transition-all duration-200",
+                "class": SELECT_ATTRS,
                 "min": "1",
             }
         ),
     )
     difficulty = forms.ChoiceField(
         choices=Question.DIFFICULTY_CHOICES,
-        widget=forms.Select(
-            attrs={
-                "class": "block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500/20 transition-all duration-200",
-            }
-        ),
+        widget=forms.Select(attrs={"class": SELECT_ATTRS}),
     )
     subject = forms.ModelChoiceField(
         queryset=Subject.objects.all(),
         empty_label="Select subject",
-        widget=forms.Select(
-            attrs={
-                "class": "block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500/20 transition-all duration-200",
-            }
-        ),
+        widget=forms.Select(attrs={"class": SELECT_ATTRS}),
     )
     topic = forms.ModelChoiceField(
         queryset=Topic.objects.all(),
         required=False,
         empty_label="Select topic (optional)",
-        widget=forms.Select(
-            attrs={
-                "class": "block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500/20 transition-all duration-200",
-            }
-        ),
+        widget=forms.Select(attrs={"class": SELECT_ATTRS}),
+    )
+    class_level = forms.ModelChoiceField(
+        queryset=ClassLevel.objects.all(),
+        required=False,
+        empty_label="Select class level (optional)",
+        widget=forms.Select(attrs={"class": SELECT_ATTRS}),
     )
     tags_input = forms.CharField(
         required=False,
@@ -82,18 +76,21 @@ class QuestionForm(forms.ModelForm):
     )
     status = forms.ChoiceField(
         choices=Question.STATUS_CHOICES,
-        widget=forms.Select(
-            attrs={
-                "class": "block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500/20 transition-all duration-200",
-            }
-        ),
+        widget=forms.Select(attrs={"class": SELECT_ATTRS}),
     )
+
+    def __init__(self, *args, school=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if school:
+            self.fields["class_level"].queryset = ClassLevel.objects.filter(school=school)
+        else:
+            self.fields["class_level"].queryset = ClassLevel.objects.all()
 
     class Meta:
         model = Question
         fields = [
             "question_text", "question_type", "explanation", "marks",
-            "difficulty", "subject", "topic", "status", "image",
+            "difficulty", "subject", "topic", "class_level", "status", "image",
         ]
 
     def clean_question_text(self):

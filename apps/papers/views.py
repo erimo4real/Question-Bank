@@ -11,6 +11,7 @@ from rest_framework.response import Response
 
 from apps.accounts.permissions import IsAdminOrTeacher
 from apps.questions.models import Question
+from apps.schools.models import ClassLevel
 from apps.subjects.models import Subject
 
 from .forms import PaperForm
@@ -29,21 +30,27 @@ class PaperListView(LoginRequiredMixin, View):
         if request.user.is_super_admin_role:
             papers = ExamPaper.objects.all().select_related("subject").order_by("-created_at")
             subjects = Subject.objects.all()
+            class_levels = ClassLevel.objects.all()
         elif request.user.is_school_admin_role:
             papers = ExamPaper.objects.filter(school=request.user.school).select_related("subject").order_by("-created_at")
             subjects = Subject.objects.filter(school=request.user.school)
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
         else:
             papers = ExamPaper.objects.filter(school=request.user.school).select_related("subject").order_by("-created_at")
             papers = papers.filter(subject__in=request.user.subjects.all())
             subjects = request.user.subjects.filter(school=request.user.school)
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
 
         q = request.GET.get("q", "")
         subject_filter = request.GET.get("subject", "")
+        class_level_filter = request.GET.get("class_level", "")
 
         if q:
             papers = papers.filter(title__icontains=q)
         if subject_filter:
             papers = papers.filter(subject_id=subject_filter)
+        if class_level_filter:
+            papers = papers.filter(class_level_id=class_level_filter)
 
         paginator = Paginator(papers, 20)
         page = request.GET.get("page")
@@ -56,23 +63,39 @@ class PaperListView(LoginRequiredMixin, View):
 
         return render(request, "papers/list.html", {
             "papers": page_obj, "page_obj": page_obj, "subjects": subjects,
-            "q": q, "subject_filter": subject_filter,
+            "class_levels": class_levels,
+            "q": q, "subject_filter": subject_filter, "class_level_filter": class_level_filter,
         })
 
 
 class PaperCreateView(LoginRequiredMixin, View):
-    def get(self, request):
+    def _get_school(self, request):
+        if request.user.is_super_admin_role:
+            return request.user.school
+        return request.user.school
+
+    def _get_context(self, request):
+        school = self._get_school(request)
         if request.user.is_super_admin_role:
             subjects = Subject.objects.all()
+            class_levels = ClassLevel.objects.all()
         elif request.user.is_school_admin_role:
-            subjects = Subject.objects.filter(school=request.user.school)
+            subjects = Subject.objects.filter(school=school)
+            class_levels = ClassLevel.objects.filter(school=school)
         else:
-            subjects = request.user.subjects.filter(school=request.user.school)
-        form = PaperForm()
-        return render(request, "papers/form.html", {"paper": None, "subjects": subjects, "form": form})
+            subjects = request.user.subjects.filter(school=school)
+            class_levels = ClassLevel.objects.filter(school=school)
+        return {"subjects": subjects, "class_levels": class_levels}
+
+    def get(self, request):
+        school = self._get_school(request)
+        form = PaperForm(school=school)
+        ctx = self._get_context(request)
+        return render(request, "papers/form.html", {"paper": None, "form": form, **ctx})
 
     def post(self, request):
-        form = PaperForm(request.POST)
+        school = self._get_school(request)
+        form = PaperForm(request.POST, school=school)
         if form.is_valid():
             subject = form.cleaned_data["subject"]
             if not request.user.is_super_admin_role and subject.school != request.user.school:
@@ -87,13 +110,8 @@ class PaperCreateView(LoginRequiredMixin, View):
             paper.save()
             messages.success(request, f'Paper "{paper.title}" created. Now add questions!')
             return redirect("paper-detail", pk=paper.pk)
-        if request.user.is_super_admin_role:
-            subjects = Subject.objects.all()
-        elif request.user.is_school_admin_role:
-            subjects = Subject.objects.filter(school=request.user.school)
-        else:
-            subjects = request.user.subjects.filter(school=request.user.school)
-        return render(request, "papers/form.html", {"paper": None, "subjects": subjects, "form": form})
+        ctx = self._get_context(request)
+        return render(request, "papers/form.html", {"paper": None, "form": form, **ctx})
 
 
 class PaperDetailView(LoginRequiredMixin, View):
@@ -134,28 +152,44 @@ class PaperDetailView(LoginRequiredMixin, View):
 
 
 class PaperEditView(LoginRequiredMixin, View):
+    def _get_school(self, request):
+        if request.user.is_super_admin_role:
+            return request.user.school
+        return request.user.school
+
+    def _get_context(self, request):
+        school = self._get_school(request)
+        if request.user.is_super_admin_role:
+            subjects = Subject.objects.all()
+            class_levels = ClassLevel.objects.all()
+        elif request.user.is_school_admin_role:
+            subjects = Subject.objects.filter(school=school)
+            class_levels = ClassLevel.objects.filter(school=school)
+        else:
+            subjects = request.user.subjects.filter(school=school)
+            class_levels = ClassLevel.objects.filter(school=school)
+        return {"subjects": subjects, "class_levels": class_levels}
+
     def get(self, request, pk):
         if request.user.is_super_admin_role:
             paper = get_object_or_404(ExamPaper, pk=pk)
-            subjects = Subject.objects.all()
         else:
             paper = get_object_or_404(ExamPaper, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
                 messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
-            if request.user.is_school_admin_role:
-                subjects = Subject.objects.filter(school=request.user.school)
-            else:
-                subjects = request.user.subjects.filter(school=request.user.school)
-        form = PaperForm(instance=paper)
-        return render(request, "papers/form.html", {"paper": paper, "subjects": subjects, "form": form})
+        school = paper.school
+        form = PaperForm(instance=paper, school=school)
+        ctx = self._get_context(request)
+        return render(request, "papers/form.html", {"paper": paper, "form": form, **ctx})
 
     def post(self, request, pk):
         if request.user.is_super_admin_role:
             paper = get_object_or_404(ExamPaper, pk=pk)
         else:
             paper = get_object_or_404(ExamPaper, pk=pk, school=request.user.school)
-        form = PaperForm(request.POST, instance=paper)
+        school = paper.school
+        form = PaperForm(request.POST, instance=paper, school=school)
         if form.is_valid():
             subject = form.cleaned_data["subject"]
             if not request.user.is_super_admin_role and subject.school != request.user.school:
@@ -167,14 +201,8 @@ class PaperEditView(LoginRequiredMixin, View):
             form.save()
             messages.success(request, "Paper updated!")
             return redirect("paper-detail", pk=paper.pk)
-        if request.user.is_super_admin_role:
-            subjects = Subject.objects.all()
-        else:
-            if request.user.is_school_admin_role:
-                subjects = Subject.objects.filter(school=request.user.school)
-            else:
-                subjects = request.user.subjects.filter(school=request.user.school)
-        return render(request, "papers/form.html", {"paper": paper, "subjects": subjects, "form": form})
+        ctx = self._get_context(request)
+        return render(request, "papers/form.html", {"paper": paper, "form": form, **ctx})
 
 
 class PaperDeleteView(LoginRequiredMixin, View):

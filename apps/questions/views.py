@@ -15,6 +15,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.accounts.permissions import IsAdminOrTeacher
+from apps.schools.models import ClassLevel
 
 from .models import Question
 from .forms import QuestionForm
@@ -44,6 +45,7 @@ class QuestionListView(LoginRequiredMixin, View):
         difficulty = request.GET.get("difficulty", "")
         status_filter = request.GET.get("status", "")
         subject = request.GET.get("subject", "")
+        class_level_filter = request.GET.get("class_level", "")
 
         if q:
             search_query = SearchQuery(q)
@@ -62,14 +64,19 @@ class QuestionListView(LoginRequiredMixin, View):
             qs = qs.filter(status=status_filter)
         if subject:
             qs = qs.filter(subject_id=subject)
+        if class_level_filter:
+            qs = qs.filter(class_level_id=class_level_filter)
 
         from apps.subjects.models import Subject
         if request.user.is_super_admin_role:
             subjects = Subject.objects.all()
+            class_levels = ClassLevel.objects.all()
         elif request.user.is_school_admin_role:
             subjects = Subject.objects.filter(school=request.user.school)
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
         else:
             subjects = request.user.subjects.filter(school=request.user.school)
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
 
         published_count = qs.filter(status="published").count()
         draft_count = qs.filter(status="draft").count()
@@ -87,7 +94,8 @@ class QuestionListView(LoginRequiredMixin, View):
             "questions": page_obj,
             "page_obj": page_obj,
             "subjects": subjects,
-            "filters": {"q": q, "type": q_type, "difficulty": difficulty, "status": status_filter, "subject": subject},
+            "class_levels": class_levels,
+            "filters": {"q": q, "type": q_type, "difficulty": difficulty, "status": status_filter, "subject": subject, "class_level": class_level_filter},
             "type_choices": Question.TYPE_CHOICES,
             "difficulty_choices": Question.DIFFICULTY_CHOICES,
             "status_choices": Question.STATUS_CHOICES,
@@ -98,27 +106,40 @@ class QuestionListView(LoginRequiredMixin, View):
 
 
 class QuestionCreateView(LoginRequiredMixin, View):
-    def get(self, request):
+    def _get_context(self, request):
         from apps.subjects.models import Subject, Topic
         if request.user.is_super_admin_role:
             subjects = Subject.objects.all()
             topics = Topic.objects.all()
+            class_levels = ClassLevel.objects.all()
         elif request.user.is_school_admin_role:
             subjects = Subject.objects.filter(school=request.user.school)
             topics = Topic.objects.filter(subject__school=request.user.school)
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
         else:
             subjects = request.user.subjects.filter(school=request.user.school)
             topics = Topic.objects.filter(subject__school=request.user.school)
-        form = QuestionForm()
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
+        return {"subjects": subjects, "topics": topics, "class_levels": class_levels}
+
+    def _get_school(self, request):
+        if request.user.is_super_admin_role:
+            return request.POST.get("school_id") or (request.user.school.pk if request.user.school else None)
+        return request.user.school
+
+    def get(self, request):
+        ctx = self._get_context(request)
+        school = self._get_school(request)
+        form = QuestionForm(school=school)
         return render(request, "questions/form.html", {
-            "question": None, "form": form, "subjects": subjects, "topics": topics,
+            "question": None, "form": form, **ctx,
             "type_choices": Question.TYPE_CHOICES,
             "difficulty_choices": Question.DIFFICULTY_CHOICES,
         })
 
     def post(self, request):
-        from apps.subjects.models import Subject
-        form = QuestionForm(request.POST, request.FILES)
+        school = self._get_school(request)
+        form = QuestionForm(request.POST, request.FILES, school=school)
         if form.is_valid():
             subject = form.cleaned_data["subject"]
             if not request.user.is_super_admin_role and subject.school != request.user.school:
@@ -139,54 +160,60 @@ class QuestionCreateView(LoginRequiredMixin, View):
             q.save()
             messages.success(request, "Question created successfully!")
             return redirect("question-edit", pk=q.pk)
-        from apps.subjects.models import Subject, Topic
-        if request.user.is_super_admin_role:
-            subjects = Subject.objects.all()
-            topics = Topic.objects.all()
-        elif request.user.is_school_admin_role:
-            subjects = Subject.objects.filter(school=request.user.school)
-            topics = Topic.objects.filter(subject__school=request.user.school)
-        else:
-            subjects = request.user.subjects.filter(school=request.user.school)
-            topics = Topic.objects.filter(subject__school=request.user.school)
+        ctx = self._get_context(request)
         return render(request, "questions/form.html", {
-            "question": None, "form": form, "subjects": subjects, "topics": topics,
+            "question": None, "form": form, **ctx,
             "type_choices": Question.TYPE_CHOICES,
             "difficulty_choices": Question.DIFFICULTY_CHOICES,
         })
 
 
 class QuestionEditView(LoginRequiredMixin, View):
-    def get(self, request, pk):
+    def _get_context(self, request):
         from apps.subjects.models import Subject, Topic
         if request.user.is_super_admin_role:
-            question = get_object_or_404(Question, pk=pk)
             subjects = Subject.objects.all()
             topics = Topic.objects.all()
+            class_levels = ClassLevel.objects.all()
+        elif request.user.is_school_admin_role:
+            subjects = Subject.objects.filter(school=request.user.school)
+            topics = Topic.objects.filter(subject__school=request.user.school)
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
+        else:
+            subjects = request.user.subjects.filter(school=request.user.school)
+            topics = Topic.objects.filter(subject__school=request.user.school)
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
+        return {"subjects": subjects, "topics": topics, "class_levels": class_levels}
+
+    def _get_school(self, request):
+        if request.user.is_super_admin_role:
+            return request.POST.get("school_id") or (request.user.school.pk if request.user.school else None)
+        return request.user.school
+
+    def get(self, request, pk):
+        if request.user.is_super_admin_role:
+            question = get_object_or_404(Question, pk=pk)
         else:
             question = get_object_or_404(Question, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and question.subject not in request.user.subjects.all():
                 messages.error(request, "You are not assigned to this subject.")
                 return redirect("question-list")
-            if request.user.is_school_admin_role:
-                subjects = Subject.objects.filter(school=request.user.school)
-            else:
-                subjects = request.user.subjects.filter(school=request.user.school)
-            topics = Topic.objects.filter(subject__school=request.user.school)
-        form = QuestionForm(instance=question, initial={"tags_input": ", ".join(question.tags or [])})
+        school = self._get_school(request)
+        form = QuestionForm(instance=question, initial={"tags_input": ", ".join(question.tags or [])}, school=school)
+        ctx = self._get_context(request)
         return render(request, "questions/form.html", {
-            "question": question, "form": form, "subjects": subjects, "topics": topics,
+            "question": question, "form": form, **ctx,
             "type_choices": Question.TYPE_CHOICES,
             "difficulty_choices": Question.DIFFICULTY_CHOICES,
         })
 
     def post(self, request, pk):
-        from apps.subjects.models import Subject, Topic
         if request.user.is_super_admin_role:
             question = get_object_or_404(Question, pk=pk)
         else:
             question = get_object_or_404(Question, pk=pk, school=request.user.school)
-        form = QuestionForm(request.POST, request.FILES, instance=question)
+        school = self._get_school(request)
+        form = QuestionForm(request.POST, request.FILES, instance=question, school=school)
         if form.is_valid():
             subject = form.cleaned_data["subject"]
             if not request.user.is_super_admin_role and subject.school != request.user.school:
@@ -205,17 +232,9 @@ class QuestionEditView(LoginRequiredMixin, View):
             q.save()
             messages.success(request, "Question updated!")
             return redirect("question-edit", pk=question.pk)
-        if request.user.is_super_admin_role:
-            subjects = Subject.objects.all()
-            topics = Topic.objects.all()
-        else:
-            if request.user.is_school_admin_role:
-                subjects = Subject.objects.filter(school=request.user.school)
-            else:
-                subjects = request.user.subjects.filter(school=request.user.school)
-            topics = Topic.objects.filter(subject__school=request.user.school)
+        ctx = self._get_context(request)
         return render(request, "questions/form.html", {
-            "question": question, "form": form, "subjects": subjects, "topics": topics,
+            "question": question, "form": form, **ctx,
             "type_choices": Question.TYPE_CHOICES,
             "difficulty_choices": Question.DIFFICULTY_CHOICES,
         })

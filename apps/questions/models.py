@@ -49,6 +49,13 @@ class Question(models.Model):
         blank=True,
         related_name="questions",
     )
+    class_level = models.ForeignKey(
+        "schools.ClassLevel",
+        on_delete=models.CASCADE,
+        related_name="questions",
+        null=True,
+        blank=True,
+    )
     image = models.ImageField(upload_to="questions/", blank=True, null=True)
     tags = models.JSONField(default=list, blank=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="draft")
