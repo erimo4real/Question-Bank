@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}API Browser{% endblock %} - Question Bank</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        pre { white-space: pre-wrap; word-break: break-word; }
+        .method-badge { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
+        .method-get { background: #dbeafe; color: #1e40af; }
+        .method-post { background: #d1fae5; color: #065f46; }
+        .method-put { background: #fef3c7; color: #92400e; }
+        .method-patch { background: #fef3c7; color: #92400e; }
+        .method-delete { background: #fee2e2; color: #991b1b; }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <nav class="bg-white border-b border-gray-200 px-6 py-3">
+        <div class="max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <a href="/api/docs/" class="text-sm font-semibold text-primary-600 hover:text-primary-700">Swagger Docs</a>
+                <a href="/api/schema/" class="text-sm text-gray-500 hover:text-gray-700">OpenAPI Schema</a>
+            </div>
+            <div class="flex items-center gap-3">
+                {% if user.is_authenticated %}
+                <span class="text-sm text-gray-600">{{ user.email }}</span>
+                <a href="{% url 'dashboard' %}" class="text-sm text-primary-600 hover:text-primary-700">Dashboard</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+    <main class="max-w-7xl mx-auto px-6 py-8">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% load question_tags %}
+{% block title %}Questions - Question Bank{% endblock %}
+{% block page_title %}Questions{% endblock %}
+
+{% block header_actions %}
+<div class="flex items-center gap-2">
+    <a href="{% url 'question-import' %}" class="inline-flex items-center gap-2 px-4 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all duration-200">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        <span class="hidden sm:inline">Import</span>
+    </a>
+    <a href="{% url 'question-create' %}"
+       class="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-500 text-white text-sm font-semibold rounded-xl hover:from-primary-700 hover:to-primary-600 shadow-lg shadow-primary-500/25 transition-all duration-200">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        <span class="hidden sm:inline">New Question</span>
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-5" x-data="{ selected: [], showFilters: {{ filters.q|yesno:'true,false' }} }">
+
+    <!-- Stats cards -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl border border-gray-100 px-5 py-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-gray-900">{{ paginator.count }}</p>
+                    <p class="text-xs text-gray-500 font-medium">Total Questions</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 px-5 py-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-emerald-600">{{ published_count }}</p>
+                    <p class="text-xs text-gray-500 font-medium">Published</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 px-5 py-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-amber-600">{{ draft_count }}</p>
+                    <p class="text-xs text-gray-500 font-medium">Drafts</p>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 px-5 py-4 shadow-sm hover:shadow-md transition-shadow duration-200">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-purple-600">{{ paginator.count }}</p>
+                    <p class="text-xs text-gray-500 font-medium">Total Marks</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <button @click="showFilters = !showFilters" class="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
+                </div>
+                <div class="text-left">
+                    <span class="text-sm font-semibold text-gray-700">Filter Questions</span>
+                    {% if filters.q or filters.subject or filters.type or filters.difficulty or filters.status %}
+                    <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-700">Active</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                {% if filters.q or filters.subject or filters.type or filters.difficulty or filters.status %}
+                <a href="{% url 'question-list' %}" class="text-xs text-gray-400 hover:text-red-500 transition-colors">Clear all</a>
+                {% endif %}
+                <svg class="w-5 h-5 text-gray-400 transition-transform duration-200" :class="showFilters ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+            </div>
+        </button>
+        <div x-show="showFilters" x-collapse x-cloak>
+            <form method="get" class="px-5 pb-5 border-t border-gray-100 pt-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div class="lg:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Search</label>
+                        <div class="relative">
+                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                            <input name="q" type="text" value="{{ filters.q }}" placeholder="Search questions..."
+                                   class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-gray-50 focus:bg-white transition-colors">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Subject</label>
+                        <select name="subject" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 bg-gray-50 focus:bg-white transition-colors">
+                            <option value="">All Subjects</option>
+                            {% for s in subjects %}
+                            <option value="{{ s.pk }}" {% if filters.subject == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Type</label>
+                        <select name="type" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 bg-gray-50 focus:bg-white transition-colors">
+                            <option value="">All Types</option>
+                            {% for val, label in type_choices %}
+                            <option value="{{ val }}" {% if filters.type == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Difficulty</label>
+                        <select name="difficulty" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 bg-gray-50 focus:bg-white transition-colors">
+                            <option value="">All Difficulty</option>
+                            {% for val, label in difficulty_choices %}
+                            <option value="{{ val }}" {% if filters.difficulty == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wider">Status</label>
+                        <select name="status" class="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 bg-gray-50 focus:bg-white transition-colors">
+                            <option value="">All Status</option>
+                            {% for val, label in status_choices %}
+                            <option value="{{ val }}" {% if filters.status == val %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="flex items-end gap-2">
+                        <button type="submit" class="px-5 py-2.5 bg-primary-600 text-white text-sm font-semibold rounded-xl hover:bg-primary-700 transition-all duration-200 shadow-sm">Apply Filters</button>
+                        <a href="{% url 'question-list' %}" class="px-4 py-2.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all duration-200">Clear</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Bulk actions bar -->
+    <div x-show="selected.length > 0" x-cloak x-transition
+         class="bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200 rounded-2xl p-3 sm:p-4 shadow-sm">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
+                    <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                </div>
+                <span class="text-sm text-primary-700 font-semibold" x-text="selected.length + ' selected'"></span>
+            </div>
+            <div class="flex items-center gap-2 sm:ml-auto flex-wrap">
+                <form method="post" action="{% url 'question-bulk-status' %}" class="flex items-center gap-2">
+                    {% csrf_token %}
+                    <template x-for="id in selected" :key="id">
+                        <input type="hidden" name="ids" :value="id">
+                    </template>
+                    <select name="new_status" class="px-3 py-2 border border-primary-200 rounded-xl text-sm bg-white focus:ring-2 focus:ring-primary-500">
+                        <option value="published">Publish</option>
+                        <option value="draft">Set Draft</option>
+                    </select>
+                    <button type="submit" class="px-4 py-2 bg-primary-600 text-white text-sm font-semibold rounded-xl hover:bg-primary-700 transition-all duration-200 shadow-sm">Apply</button>
+                </form>
+                <form method="post" action="{% url 'question-bulk-delete' %}" onsubmit="return confirm('Delete selected questions?')">
+                    {% csrf_token %}
+                    <template x-for="id in selected" :key="id">
+                        <input type="hidden" name="ids" :value="id">
+                    </template>
+                    <button type="submit" class="px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-xl hover:bg-red-700 transition-all duration-200 shadow-sm">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Questions Table -->
+    {% if questions %}
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-100">
+                        <th class="px-3 sm:px-5 py-4 text-left w-10">
+                            <input type="checkbox" class="rounded-lg border-gray-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                                   @change="selected = $event.target.checked ? [{% for q in questions %}'{{ q.id }}',{% endfor %}] : []">
+                        </th>
+                        <th class="px-3 sm:px-5 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Question</th>
+                        <th class="px-3 sm:px-5 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Type</th>
+                        <th class="px-3 sm:px-5 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Difficulty</th>
+                        <th class="px-3 sm:px-5 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Marks</th>
+                        <th class="px-3 sm:px-5 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-5 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    {% for q in questions %}
+                    <tr class="hover:bg-gray-50/50 transition-colors duration-150 group">
+                        <td class="px-3 sm:px-5 py-4">
+                            <input type="checkbox" value="{{ q.id }}" class="rounded-lg border-gray-300 text-primary-600 focus:ring-primary-500 w-4 h-4"
+                                   x-model="selected">
+                        </td>
+                        <td class="px-3 sm:px-5 py-4">
+                            <div class="flex items-start gap-2">
+                                {% is_new q.created_at as new %}
+                                {% if new %}<span class="inline-flex px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-gradient-to-r from-red-500 to-pink-500 text-white leading-none shadow-sm">NEW</span>{% endif %}
+                                <div class="min-w-0">
+                                    <p class="text-gray-900 font-medium line-clamp-1 group-hover:text-primary-700 transition-colors">{{ q.question_text|truncatewords:25 }}</p>
+                                    <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                                        {% if q.subject %}
+                                        <span class="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{{ q.subject.name }}</span>
+                                        {% endif %}
+                                        {% if q.topic %}
+                                        <span class="text-xs text-gray-300">&rsaquo;</span>
+                                        <span class="inline-flex items-center gap-1 text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{{ q.topic.name }}</span>
+                                        {% endif %}
+                                        <!-- Mobile badges -->
+                                        <span class="md:hidden inline-flex px-1.5 py-0.5 rounded-md text-[10px] font-semibold
+                                            {% if q.question_type == 'mcq' %}bg-blue-100 text-blue-700
+                                            {% elif q.question_type == 'true_false' %}bg-green-100 text-green-700
+                                            {% elif q.question_type == 'essay' %}bg-purple-100 text-purple-700
+                                            {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                            {{ q.get_question_type_display }}
+                                        </span>
+                                        <span class="lg:hidden inline-flex px-1.5 py-0.5 rounded-md text-[10px] font-semibold
+                                            {% if q.difficulty == 'easy' %}bg-green-100 text-green-700
+                                            {% elif q.difficulty == 'medium' %}bg-amber-100 text-amber-700
+                                            {% else %}bg-red-100 text-red-700{% endif %}">
+                                            {{ q.get_difficulty_display }}
+                                        </span>
+                                        <span class="lg:hidden text-xs text-gray-400 font-medium">{{ q.marks }}m</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-3 sm:px-5 py-4 hidden md:table-cell">
+                            <span class="inline-flex px-2.5 py-1 rounded-lg text-xs font-semibold
+                                {% if q.question_type == 'mcq' %}bg-blue-50 text-blue-700 border border-blue-100
+                                {% elif q.question_type == 'true_false' %}bg-green-50 text-green-700 border border-green-100
+                                {% elif q.question_type == 'essay' %}bg-purple-50 text-purple-700 border border-purple-100
+                                {% elif q.question_type == 'fill_blank' %}bg-amber-50 text-amber-700 border border-amber-100
+                                {% else %}bg-gray-50 text-gray-700 border border-gray-100{% endif %}">
+                                {{ q.get_question_type_display }}
+                            </span>
+                        </td>
+                        <td class="px-3 sm:px-5 py-4 hidden lg:table-cell">
+                            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
+                                {% if q.difficulty == 'easy' %}bg-green-50 text-green-700 border border-green-100
+                                {% elif q.difficulty == 'medium' %}bg-amber-50 text-amber-700 border border-amber-100
+                                {% else %}bg-red-50 text-red-700 border border-red-100{% endif %}">
+                                {% if q.difficulty == 'easy' %}
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                                {% elif q.difficulty == 'medium' %}
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 11.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4A1 1 0 0011 9V7z" clip-rule="evenodd"/></svg>
+                                {% else %}
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                                {% endif %}
+                                {{ q.get_difficulty_display }}
+                            </span>
+                        </td>
+                        <td class="px-3 sm:px-5 py-4 hidden lg:table-cell">
+                            <span class="text-sm font-semibold text-gray-700">{{ q.marks }}</span>
+                        </td>
+                        <td class="px-3 sm:px-5 py-4">
+                            {% if q.status == 'published' %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                Published
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                                <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                                Draft
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-3 sm:px-5 py-4 text-right">
+                            <div class="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
+                                <a href="{% url 'question-preview' q.pk %}" class="p-2 text-gray-400 hover:text-blue-600 rounded-xl hover:bg-blue-50 transition-all duration-200" title="Preview">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                </a>
+                                <a href="{% url 'question-edit' q.pk %}" class="p-2 text-gray-400 hover:text-primary-600 rounded-xl hover:bg-primary-50 transition-all duration-200" title="Edit">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                </a>
+                                <form method="post" action="{% url 'question-delete' q.pk %}" onsubmit="return confirm('Delete this question?')">
+                                    {% csrf_token %}
+                                    <button class="p-2 text-gray-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-all duration-200" title="Delete">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "includes/pagination.html" %}
+    </div>
+    {% else %}
+    <div class="text-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
+        <div class="w-16 h-16 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+            <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <h3 class="text-lg font-semibold text-gray-900">No questions found</h3>
+        <p class="mt-2 text-sm text-gray-500 max-w-sm mx-auto">
+            {% if filters.q or filters.subject or filters.type or filters.difficulty or filters.status %}
+            Try adjusting your filters or <a href="{% url 'question-list' %}" class="text-primary-600 hover:text-primary-700 font-medium">clear all filters</a> to see all questions.
+            {% else %}
+            Get started by creating your first question to build your question bank.
+            {% endif %}
+        </p>
+        {% if not filters.q and not filters.subject and not filters.type and not filters.difficulty and not filters.status %}
+        <a href="{% url 'question-create' %}" class="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-500 text-white text-sm font-semibold rounded-xl hover:from-primary-700 hover:to-primary-600 shadow-lg shadow-primary-500/25 transition-all duration-200">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Create Question
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

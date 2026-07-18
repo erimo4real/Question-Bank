@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Question Preview - Question Bank{% endblock %}
+{% block page_title %}Question Preview{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl space-y-6">
+    <!-- Question Card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <!-- Header -->
+        <div class="px-6 py-5 border-b border-gray-100">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="inline-flex px-2.5 py-1 rounded-lg text-xs font-semibold
+                    {% if question.question_type == 'mcq' %}bg-blue-50 text-blue-700 border border-blue-100
+                    {% elif question.question_type == 'true_false' %}bg-green-50 text-green-700 border border-green-100
+                    {% elif question.question_type == 'essay' %}bg-purple-50 text-purple-700 border border-purple-100
+                    {% elif question.question_type == 'fill_blank' %}bg-amber-50 text-amber-700 border border-amber-100
+                    {% else %}bg-gray-50 text-gray-700 border border-gray-100{% endif %}">
+                    {{ question.get_question_type_display }}
+                </span>
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
+                    {% if question.difficulty == 'easy' %}bg-green-50 text-green-700 border border-green-100
+                    {% elif question.difficulty == 'medium' %}bg-amber-50 text-amber-700 border border-amber-100
+                    {% else %}bg-red-50 text-red-700 border border-red-100{% endif %}">
+                    {{ question.get_difficulty_display }}
+                </span>
+                <span class="text-sm font-semibold text-gray-500">{{ question.marks }} mark{{ question.marks|pluralize }}</span>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold
+                    {% if question.status == 'published' %}bg-emerald-50 text-emerald-700 border border-emerald-100{% else %}bg-gray-100 text-gray-600 border border-gray-200{% endif %}">
+                    {% if question.status == 'published' %}<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>{% endif %}
+                    {{ question.get_status_display }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Body -->
+        <div class="p-6">
+            <h2 class="text-lg font-bold text-gray-900 mb-6">{{ question.question_text }}</h2>
+
+            {% if question.options %}
+            <div class="space-y-3 mb-6">
+                {% for opt in question.options %}
+                <div class="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl border border-gray-100
+                    {% if opt in question.correct_answer %}bg-emerald-50 border-emerald-200{% endif %}">
+                    <span class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold
+                        {% if opt in question.correct_answer %}bg-emerald-500 text-white{% else %}bg-gray-200 text-gray-600{% endif %}">
+                        {% if forloop.counter == 1 %}A{% elif forloop.counter == 2 %}B{% elif forloop.counter == 3 %}C{% elif forloop.counter == 4 %}D{% elif forloop.counter == 5 %}E{% elif forloop.counter == 6 %}F{% elif forloop.counter == 7 %}G{% elif forloop.counter == 8 %}H{% endif %}
+                    </span>
+                    <span class="text-sm text-gray-900 flex-1">{{ opt }}</span>
+                    {% if opt in question.correct_answer %}
+                    <svg class="w-5 h-5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if question.correct_answer %}
+            <div class="p-4 bg-emerald-50 rounded-xl border border-emerald-200 mb-5">
+                <p class="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-1">Correct Answer</p>
+                <p class="text-sm font-medium text-emerald-800">
+                    {% for a in question.correct_answer %}{{ a }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                </p>
+            </div>
+            {% endif %}
+
+            {% if question.explanation %}
+            <div class="p-4 bg-blue-50 rounded-xl border border-blue-200 mb-5">
+                <p class="text-xs font-semibold text-blue-600 uppercase tracking-wider mb-1">Explanation</p>
+                <p class="text-sm text-blue-800">{{ question.explanation }}</p>
+            </div>
+            {% endif %}
+
+            {% if question.tags %}
+            <div class="flex flex-wrap gap-2 mb-5">
+                {% for tag in question.tags %}
+                <span class="px-2.5 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg border border-gray-200 font-medium">{{ tag }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="text-xs text-gray-400 border-t border-gray-100 pt-4">
+                {% if question.created_by %}Created by {{ question.created_by.get_full_name|default:question.created_by.email }} &middot;{% endif %}
+                {{ question.times_used }} time{{ question.times_used|pluralize }} used &middot;
+                Created {{ question.created_at|timesince }} ago
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex items-center gap-3">
+        <a href="{% url 'question-edit' question.pk %}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-500 text-white text-sm font-semibold rounded-xl hover:from-primary-700 hover:to-primary-600 shadow-lg shadow-primary-500/25 transition-all duration-200">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            Edit Question
+        </a>
+        <a href="{% url 'question-list' %}" class="px-4 py-2.5 text-sm font-semibold text-gray-500 hover:text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all duration-200">Back to Questions</a>
+    </div>
+</div>
+{% endblock %}
