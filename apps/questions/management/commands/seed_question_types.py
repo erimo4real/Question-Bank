@@ -122,11 +122,15 @@ class Command(BaseCommand):
             return
 
         created_total = 0
+        skipped_total = 0
         for q_type, questions in QUESTION_DATA.items():
             random.shuffle(questions)
             for i, data in enumerate(questions):
                 subject = subjects[i % len(subjects)]
-                q = Question.objects.create(
+                if Question.objects.filter(question_text=data["q"], school=subject.school).exists():
+                    skipped_total += 1
+                    continue
+                Question.objects.create(
                     question_text=data["q"],
                     question_type=q_type,
                     options=[],
@@ -141,6 +145,6 @@ class Command(BaseCommand):
                     school=subject.school,
                 )
                 created_total += 1
-            self.stdout.write(f"  Created {len(questions)} {q_type} questions")
+            self.stdout.write(f"  {q_type}: {len(questions)} questions processed")
 
-        self.stdout.write(self.style.SUCCESS(f"\nDone — {created_total} questions created across {len(subjects)} subjects"))
+        self.stdout.write(self.style.SUCCESS(f"\nDone — {created_total} created, {skipped_total} skipped"))
