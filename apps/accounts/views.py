@@ -57,7 +57,7 @@ class LoginTemplateView(View):
             email = form.cleaned_data["email"]
             password = form.cleaned_data["password"]
             remember_me = form.cleaned_data.get("remember_me")
-            user = authenticate(request, email=email, password=password)
+            user = authenticate(request, username=email, password=password)
             if user is not None:
                 login(request, user)
                 if not remember_me:
