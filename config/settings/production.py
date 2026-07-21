@@ -3,7 +3,7 @@ import dj_database_url
 
 DEBUG = False
 
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="", cast=lambda v: [s.strip() for s in v.split(",") if s.strip()])
+ALLOWED_HOSTS = ["question-bank-s5xf.onrender.com"]
 
 # PostgreSQL — supports both direct Neon URL and individual env vars
 DATABASE_URL = config("DATABASE_URL", default="")
