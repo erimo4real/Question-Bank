@@ -104,7 +104,7 @@ class ClassLevelListView(AdminRequiredMixin, View):
         except EmptyPage:
             page_obj = paginator.page(paginator.num_pages)
 
-        from apps.schools.models import School
+        from apps.schools.models import School  # noqa: F811
         if request.user.is_super_admin_role:
             schools = School.objects.all()
         else:

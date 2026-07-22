@@ -180,7 +180,7 @@ class TopicListView(LoginRequiredMixin, View):
         except EmptyPage:
             page_obj = paginator.page(paginator.num_pages)
 
-        from apps.subjects.models import Subject
+        from apps.subjects.models import Subject  # noqa: F811
         if request.user.is_super_admin_role:
             all_subjects = Subject.objects.all()
             class_levels = ClassLevel.objects.all()

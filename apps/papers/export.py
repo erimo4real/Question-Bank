@@ -1,6 +1,6 @@
 import io
 
-from docx.shared import Pt
+from docx.shared import Pt  # noqa: F401
 from django.http import HttpResponse
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet

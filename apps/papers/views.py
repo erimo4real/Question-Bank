@@ -290,6 +290,13 @@ class PaperRemoveQuestionView(LoginRequiredMixin, View):
 
 
 class PaperAutoFillView(LoginRequiredMixin, View):
+    @staticmethod
+    def _safe_int(value, default=0):
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return default
+
     def post(self, request, pk):
         if request.user.is_super_admin_role:
             paper = get_object_or_404(ExamPaper, pk=pk)
@@ -298,9 +305,9 @@ class PaperAutoFillView(LoginRequiredMixin, View):
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
                 messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
-        easy = int(request.POST.get("easy", 0))
-        medium = int(request.POST.get("medium", 0))
-        hard = int(request.POST.get("hard", 0))
+        easy = self._safe_int(request.POST.get("easy", 0))
+        medium = self._safe_int(request.POST.get("medium", 0))
+        hard = self._safe_int(request.POST.get("hard", 0))
         existing_ids = ExamPaperQuestion.objects.filter(exam_paper=paper).values_list("question_id", flat=True)
         order = paper.paper_questions.count()
         added = 0

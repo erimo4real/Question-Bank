@@ -1,4 +1,5 @@
 from django import forms
+from django.core.exceptions import ValidationError
 
 from apps.accounts.forms import SchoolForm as SchoolFormBase
 
