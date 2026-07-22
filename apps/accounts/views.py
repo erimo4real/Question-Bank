@@ -55,8 +55,10 @@ class LoginTemplateView(View):
             user = authenticate(request, username=email, password=password)
             if user is not None:
                 login(request, user)
-                if not remember_me:
-                    request.session.set_expiry(0)
+                if remember_me:
+                    request.session.set_expiry(60 * 60 * 24 * 14)  # 2 weeks
+                else:
+                    request.session.set_expiry(0)  # browser close
                 return redirect("dashboard")
         messages.error(request, "Invalid email or password.")
         return render(request, "accounts/login.html", {"form": form})
