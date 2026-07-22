@@ -1,8 +1,5 @@
-import json
-
 from django import forms
 from django.contrib.auth import get_user_model
-from django.contrib.auth.forms import AuthenticationForm
 
 from apps.schools.models import School
 from apps.subjects.models import Subject
@@ -10,7 +7,7 @@ from apps.subjects.models import Subject
 User = get_user_model()
 
 
-class LoginForm(AuthenticationForm):
+class LoginForm(forms.Form):
     email = forms.EmailField(
         widget=forms.EmailInput(
             attrs={
@@ -36,24 +33,6 @@ class LoginForm(AuthenticationForm):
             attrs={"class": "h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"}
         ),
     )
-
-    def clean(self):
-        email = self.cleaned_data.get("email")
-        password = self.cleaned_data.get("password")
-        if email and password:
-            self.user_cache = self.authenticate(self.request, username=email, password=password)
-            if self.user_cache is None:
-                raise forms.ValidationError("Invalid email or password.")
-        return self.cleaned_data
-
-    def authenticate(self, request, username=None, password=None, **kwargs):
-        try:
-            user = User.objects.get(email=username)
-            if user.check_password(password):
-                return user
-        except User.DoesNotExist:
-            pass
-        return None
 
 
 class RegisterForm(forms.ModelForm):

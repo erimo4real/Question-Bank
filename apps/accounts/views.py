@@ -1,11 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth.views import (
-    PasswordResetCompleteView as DjangoPasswordResetCompleteView,
-    PasswordResetConfirmView as DjangoPasswordResetConfirmView,
-    PasswordResetDoneView as DjangoPasswordResetDoneView,
-)
 from django.contrib.auth.tokens import default_token_generator
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Q
@@ -52,7 +47,7 @@ class LoginTemplateView(View):
         return render(request, "accounts/login.html", {"form": form})
 
     def post(self, request):
-        form = LoginForm(request, request.POST)
+        form = LoginForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data["email"]
             password = form.cleaned_data["password"]
