@@ -52,7 +52,7 @@ class LoginTemplateView(View):
         return render(request, "accounts/login.html", {"form": form})
 
     def post(self, request):
-        form = LoginForm(request.POST)
+        form = LoginForm(request, request.POST)
         if form.is_valid():
             email = form.cleaned_data["email"]
             password = form.cleaned_data["password"]
