@@ -28,6 +28,13 @@ from .serializers import (
 
 def _htmx_messages(request):
     msgs = [{"text": str(m), "tag": m.tags} for m in dj_messages.get_messages(request)]
+
+
+def _htmx_render(request, template, ctx=None, **kwargs):
+    response = render(request, template, ctx, **kwargs)
+    for key, val in _htmx_messages(request).items():
+        response[key] = val
+    return response
     return {"X-Messages": json.dumps(msgs)}
 
 
@@ -136,7 +143,7 @@ class PaperCreateView(LoginRequiredMixin, View):
             return redirect("paper-detail", pk=paper.pk)
         ctx = self._get_context(request)
         template = "papers/_form_content.html" if request.headers.get("HX-Request") else "papers/form.html"
-        return render(request, template, {"paper": None, "form": form, **ctx}, headers=_htmx_messages(request))
+        return _htmx_render(request, template, {"paper": None, "form": form, **ctx})
 
 
 class PaperDetailView(LoginRequiredMixin, View):
@@ -235,7 +242,7 @@ class PaperEditView(LoginRequiredMixin, View):
             return redirect("paper-detail", pk=paper.pk)
         ctx = self._get_context(request)
         template = "papers/_form_content.html" if request.headers.get("HX-Request") else "papers/form.html"
-        return render(request, template, {"paper": paper, "form": form, **ctx}, headers=_htmx_messages(request))
+        return _htmx_render(request, template, {"paper": paper, "form": form, **ctx})
 
 
 class PaperDeleteView(LoginRequiredMixin, View):
@@ -354,7 +361,7 @@ class PaperRemoveQuestionView(LoginRequiredMixin, View):
 
     def _render_detail(self, paper_pk, request):
         """Re-render the paper detail page for HTMX."""
-        return render(request, "papers/_detail_content.html", self._get_context(paper_pk, request), headers=_htmx_messages(request))
+        return _htmx_render(request, "papers/_detail_content.html", self._get_context(paper_pk, request))
 
     def _get_context(self, paper_pk, request):
         paper = get_object_or_404(ExamPaper, pk=paper_pk)

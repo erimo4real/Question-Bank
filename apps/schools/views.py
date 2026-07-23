@@ -24,6 +24,13 @@ def _htmx_messages(request):
     return {"X-Messages": json.dumps(msgs)}
 
 
+def _htmx_render(request, template, ctx=None, **kwargs):
+    response = render(request, template, ctx, **kwargs)
+    for key, val in _htmx_messages(request).items():
+        response[key] = val
+    return response
+
+
 class SchoolListView(SuperAdminRequiredMixin, View):
     def get(self, request):
         schools = School.objects.all().order_by("name")
@@ -61,7 +68,7 @@ class SchoolCreateView(SuperAdminRequiredMixin, View):
                 return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("school-list")})
             return redirect("school-list")
         template = "schools/_form_content.html" if request.headers.get("HX-Request") else "schools/form.html"
-        return render(request, template, {"school": None, "form": form}, headers=_htmx_messages(request))
+        return _htmx_render(request, template, {"school": None, "form": form})
 
 
 class SchoolEditView(SuperAdminRequiredMixin, View):
@@ -81,7 +88,7 @@ class SchoolEditView(SuperAdminRequiredMixin, View):
                 return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("school-list")})
             return redirect("school-list")
         template = "schools/_form_content.html" if request.headers.get("HX-Request") else "schools/form.html"
-        return render(request, template, {"school": school, "form": form}, headers=_htmx_messages(request))
+        return _htmx_render(request, template, {"school": school, "form": form})
 
 
 class SchoolDeleteView(SuperAdminRequiredMixin, View):
@@ -163,7 +170,7 @@ class ClassLevelCreateView(AdminRequiredMixin, View):
                 return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("classlevel-list")})
             return redirect("classlevel-list")
         template = "schools/_classlevel_form_content.html" if request.headers.get("HX-Request") else "schools/classlevel_form.html"
-        return render(request, template, {"class_level": None, "form": form}, headers=_htmx_messages(request))
+        return _htmx_render(request, template, {"class_level": None, "form": form})
 
 
 class ClassLevelEditView(AdminRequiredMixin, View):
@@ -193,7 +200,7 @@ class ClassLevelEditView(AdminRequiredMixin, View):
                 return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("classlevel-list")})
             return redirect("classlevel-list")
         template = "schools/_classlevel_form_content.html" if request.headers.get("HX-Request") else "schools/classlevel_form.html"
-        return render(request, template, {"class_level": class_level, "form": form}, headers=_htmx_messages(request))
+        return _htmx_render(request, template, {"class_level": class_level, "form": form})
 
 
 class ClassLevelDeleteView(AdminRequiredMixin, View):

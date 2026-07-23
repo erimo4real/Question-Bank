@@ -23,6 +23,13 @@ def _htmx_messages(request):
     return {"X-Messages": json.dumps(msgs)}
 
 
+def _htmx_render(request, template, ctx=None, **kwargs):
+    response = render(request, template, ctx, **kwargs)
+    for key, val in _htmx_messages(request).items():
+        response[key] = val
+    return response
+
+
 def generate_subject_code(name, school):
     base = name[:4].upper().strip()
     if not Subject.objects.filter(code=base, school=school).exists():
@@ -87,7 +94,7 @@ class SubjectCreateView(LoginRequiredMixin, View):
             if not school:
                 dj_messages.error(request, "No school assigned to your account.")
                 template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
-                return render(request, template, {"subject": None, "form": form, "class_levels": ClassLevel.objects.all()}, headers=_htmx_messages(request))
+                return _htmx_render(request, template, {"subject": None, "form": form, "class_levels": ClassLevel.objects.all()})
             subject = form.save(commit=False)
             subject.school = school
             subject.created_by = request.user
@@ -96,7 +103,7 @@ class SubjectCreateView(LoginRequiredMixin, View):
             if Subject.objects.filter(name__iexact=subject.name, school=school).exists():
                 dj_messages.error(request, f'A subject named "{subject.name}" already exists in this school.')
                 template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
-                return render(request, template, {"subject": None, "form": form, "class_levels": ClassLevel.objects.filter(school=school)}, headers=_htmx_messages(request))
+                return _htmx_render(request, template, {"subject": None, "form": form, "class_levels": ClassLevel.objects.filter(school=school)})
             subject.save()
             dj_messages.success(request, f'Subject "{subject.name}" created.')
             if request.headers.get("HX-Request"):
@@ -104,7 +111,7 @@ class SubjectCreateView(LoginRequiredMixin, View):
             return redirect("subject-list")
         class_levels = ClassLevel.objects.filter(school=school) if school else ClassLevel.objects.all()
         template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
-        return render(request, template, {"subject": None, "form": form, "class_levels": class_levels}, headers=_htmx_messages(request))
+        return _htmx_render(request, template, {"subject": None, "form": form, "class_levels": class_levels})
 
     def _get_school(self, request):
         if request.user.is_super_admin_role:
@@ -143,7 +150,7 @@ class SubjectEditView(LoginRequiredMixin, View):
             if Subject.objects.filter(name__iexact=updated.name, school=school).exclude(pk=pk).exists():
                 dj_messages.error(request, f'A subject named "{updated.name}" already exists in this school.')
                 template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
-                return render(request, template, {"subject": subject, "form": form, "class_levels": ClassLevel.objects.filter(school=school)}, headers=_htmx_messages(request))
+                return _htmx_render(request, template, {"subject": subject, "form": form, "class_levels": ClassLevel.objects.filter(school=school)})
             updated.save()
             dj_messages.success(request, f'Subject "{updated.name}" updated.')
             if request.headers.get("HX-Request"):
@@ -151,7 +158,7 @@ class SubjectEditView(LoginRequiredMixin, View):
             return redirect("subject-list")
         class_levels = ClassLevel.objects.filter(school=school) if school else ClassLevel.objects.all()
         template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
-        return render(request, template, {"subject": subject, "form": form, "class_levels": class_levels}, headers=_htmx_messages(request))
+        return _htmx_render(request, template, {"subject": subject, "form": form, "class_levels": class_levels})
 
 
 class SubjectDeleteView(LoginRequiredMixin, View):
@@ -255,7 +262,7 @@ class TopicCreateStandaloneView(LoginRequiredMixin, View):
                 if subject.school != request.user.school:
                     dj_messages.error(request, "Subject not found.")
                     if request.headers.get("HX-Request"):
-                        return render(request, "subjects/_topic_form_content.html", {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
+                        return _htmx_render(request, "subjects/_topic_form_content.html", {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form})
                     return redirect("topic-create")
             topic = form.save()
             dj_messages.success(request, f'Topic "{topic.name}" created under {subject.name}.')
@@ -263,7 +270,7 @@ class TopicCreateStandaloneView(LoginRequiredMixin, View):
                 return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("topic-list")})
             return redirect("topic-list")
         template = "subjects/_topic_form_content.html" if request.headers.get("HX-Request") else "subjects/topic_form.html"
-        return render(request, template, {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
+        return _htmx_render(request, template, {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form})
 
 
 class TopicEditView(LoginRequiredMixin, View):
@@ -295,7 +302,7 @@ class TopicEditView(LoginRequiredMixin, View):
             if not request.user.is_super_admin_role and subject.school != request.user.school:
                 dj_messages.error(request, "Subject not found.")
                 if request.headers.get("HX-Request"):
-                    return render(request, "subjects/_topic_form_content.html", {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
+                    return _htmx_render(request, "subjects/_topic_form_content.html", {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form})
                 return redirect("topic-list")
             form.save()
             dj_messages.success(request, f'Topic "{topic.name}" updated.')
@@ -303,7 +310,7 @@ class TopicEditView(LoginRequiredMixin, View):
                 return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("topic-list")})
             return redirect("topic-list")
         template = "subjects/_topic_form_content.html" if request.headers.get("HX-Request") else "subjects/topic_form.html"
-        return render(request, template, {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
+        return _htmx_render(request, template, {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form})
 
 
 class TopicDeleteStandaloneView(LoginRequiredMixin, View):
@@ -332,7 +339,7 @@ class TopicCreateView(LoginRequiredMixin, View):
             dj_messages.success(request, f'Topic "{name}" added to {subject.name}.')
         if request.headers.get("HX-Request"):
             topics = subject.topics.all()
-            return render(request, "subjects/_topic_tags.html", {"subject": subject, "topics": topics}, headers=_htmx_messages(request))
+            return _htmx_render(request, "subjects/_topic_tags.html", {"subject": subject, "topics": topics})
         return redirect("subject-list")
 
 
@@ -347,7 +354,7 @@ class TopicDeleteView(LoginRequiredMixin, View):
         dj_messages.success(request, "Topic deleted.")
         if request.headers.get("HX-Request"):
             topics = subject.topics.all()
-            return render(request, "subjects/_topic_tags.html", {"subject": subject, "topics": topics}, headers=_htmx_messages(request))
+            return _htmx_render(request, "subjects/_topic_tags.html", {"subject": subject, "topics": topics})
         return redirect("subject-list")
 
 

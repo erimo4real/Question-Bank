@@ -39,6 +39,13 @@ def _htmx_messages(request):
     return {"X-Messages": json.dumps(msgs)}
 
 
+def _htmx_render(request, template, ctx=None, **kwargs):
+    response = render(request, template, ctx, **kwargs)
+    for key, val in _htmx_messages(request).items():
+        response[key] = val
+    return response
+
+
 class RootRedirectView(View):
     def get(self, request):
         if request.user.is_authenticated:
@@ -128,7 +135,7 @@ class SettingsTemplateView(LoginRequiredMixin, View):
             return redirect("settings")
         password_form = PasswordChangeForm(user=request.user)
         if request.headers.get("HX-Request"):
-            return render(request, "accounts/_profile_form_content.html", {"form": form, "password_form": password_form}, headers=_htmx_messages(request))
+            return _htmx_render(request, "accounts/_profile_form_content.html", {"form": form, "password_form": password_form})
         return render(request, "accounts/settings.html", {"form": form, "password_form": password_form})
 
 
@@ -144,7 +151,7 @@ class ProfilePasswordChangeView(LoginRequiredMixin, View):
         dj_messages.error(request, "Please correct the errors below.")
         settings_form = SettingsForm(instance=request.user)
         if request.headers.get("HX-Request"):
-            return render(request, "accounts/_password_form_content.html", {"form": settings_form, "password_form": form}, headers=_htmx_messages(request))
+            return _htmx_render(request, "accounts/_password_form_content.html", {"form": settings_form, "password_form": form})
         return render(request, "accounts/settings.html", {"form": settings_form, "password_form": form})
 
 

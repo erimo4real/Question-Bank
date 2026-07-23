@@ -33,6 +33,13 @@ def _htmx_messages(request):
     return {"X-Messages": json.dumps(msgs)}
 
 
+def _htmx_render(request, template, ctx=None, **kwargs):
+    response = render(request, template, ctx, **kwargs)
+    for key, val in _htmx_messages(request).items():
+        response[key] = val
+    return response
+
+
 # ─── Template Views ───────────────────────────────────────────────
 
 class QuestionListView(LoginRequiredMixin, View):
@@ -298,7 +305,7 @@ class QuestionImportView(LoginRequiredMixin, View):
         if not file:
             dj_messages.error(request, "No file provided.")
             if request.headers.get("HX-Request"):
-                return render(request, "questions/_import_content.html", headers=_htmx_messages(request))
+                return _htmx_render(request, "questions/_import_content.html")
             return redirect("question-import")
 
         try:
@@ -307,7 +314,7 @@ class QuestionImportView(LoginRequiredMixin, View):
         except Exception:
             dj_messages.error(request, "Invalid CSV file.")
             if request.headers.get("HX-Request"):
-                return render(request, "questions/_import_content.html", headers=_htmx_messages(request))
+                return _htmx_render(request, "questions/_import_content.html")
             return redirect("question-import")
 
         created = 0
@@ -434,7 +441,7 @@ class QuestionBulkDeleteView(LoginRequiredMixin, View):
             "status_choices": Question.STATUS_CHOICES,
             "published_count": published_count, "draft_count": draft_count, "total_marks": total_marks, "paginator": paginator_obj,
         }
-        return render(request, "questions/_list_content.html", ctx, headers=_htmx_messages(request))
+        return _htmx_render(request, "questions/_list_content.html", ctx)
 
 
 class QuestionBulkStatusView(LoginRequiredMixin, View):
