@@ -109,6 +109,10 @@ class ExamPaperQuestion(models.Model):
     def __str__(self):
         return f"{self.exam_paper.title} - Q{self.order}"
 
+    @property
+    def marks(self):
+        return self.marks_override if self.marks_override is not None else self.question.marks
+
     def clean(self):
         super().clean()
         if self.order < 1:

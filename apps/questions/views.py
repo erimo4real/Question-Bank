@@ -438,6 +438,12 @@ class QuestionBulkStatusView(LoginRequiredMixin, View):
     def post(self, request):
         ids = request.POST.getlist("ids")
         new_status = request.POST.get("new_status", "published")
+        valid_statuses = [choice[0] for choice in Question.STATUS_CHOICES]
+        if new_status not in valid_statuses:
+            dj_messages.error(request, f"Invalid status: {new_status}")
+            if request.headers.get("HX-Request"):
+                return QuestionBulkDeleteView()._render_list(request)
+            return redirect("question-list")
         if request.user.is_super_admin_role:
             updated = Question.objects.filter(id__in=ids).update(status=new_status)
         else:

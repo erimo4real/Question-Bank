@@ -31,6 +31,13 @@ def _htmx_messages(request):
     return {"X-Messages": json.dumps(msgs)}
 
 
+def _safe_int(value, default=0):
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+
 # ─── Template Views ───────────────────────────────────────────────
 
 class PaperListView(LoginRequiredMixin, View):
@@ -243,7 +250,7 @@ class PaperDeleteView(LoginRequiredMixin, View):
         paper.delete()
         dj_messages.success(request, "Paper deleted.")
         if request.headers.get("HX-Request"):
-            return HttpResponse("", headers=_htmx_messages(request))
+            return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("paper-list")})
         return redirect("paper-list")
 
 
@@ -284,9 +291,9 @@ class PaperBulkAddView(LoginRequiredMixin, View):
                 return redirect("paper-list")
         random_mode = request.POST.get("random")
         if random_mode:
-            easy_count = int(request.POST.get("easy_count", 0) or 0)
-            medium_count = int(request.POST.get("medium_count", 0) or 0)
-            hard_count = int(request.POST.get("hard_count", 0) or 0)
+            easy_count = _safe_int(request.POST.get("easy_count", 0))
+            medium_count = _safe_int(request.POST.get("medium_count", 0))
+            hard_count = _safe_int(request.POST.get("hard_count", 0))
             existing_ids = ExamPaperQuestion.objects.filter(exam_paper=paper).values_list("question_id", flat=True)
             order = paper.paper_questions.count()
             added = 0
@@ -416,10 +423,29 @@ class PaperReorderView(LoginRequiredMixin, View):
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
                 dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
+        orders = {}
         for pq in paper.paper_questions.all():
             new_order = request.POST.get(f"order_{pq.pk}")
             if new_order is not None:
-                pq.order = int(new_order)
+                val = _safe_int(new_order, 0)
+                if val < 1:
+                    continue
+                orders[pq.pk] = val
+        seen = set()
+        has_dupes = False
+        for pk_val, order in orders.items():
+            if order in seen:
+                has_dupes = True
+                break
+            seen.add(order)
+        if has_dupes:
+            dj_messages.error(request, "Duplicate order numbers are not allowed.")
+            if request.headers.get("HX-Request"):
+                return PaperRemoveQuestionView()._render_detail(pk, request)
+            return redirect("paper-detail", pk=paper.pk)
+        for pq in paper.paper_questions.all():
+            if pq.pk in orders:
+                pq.order = orders[pq.pk]
                 pq.save(update_fields=["order"])
         dj_messages.success(request, "Questions reordered.")
         if request.headers.get("HX-Request"):

@@ -93,6 +93,10 @@ class SubjectCreateView(LoginRequiredMixin, View):
             subject.created_by = request.user
             if not subject.code:
                 subject.code = generate_subject_code(subject.name, school)
+            if Subject.objects.filter(name__iexact=subject.name, school=school).exists():
+                dj_messages.error(request, f'A subject named "{subject.name}" already exists in this school.')
+                template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
+                return render(request, template, {"subject": None, "form": form, "class_levels": ClassLevel.objects.filter(school=school)}, headers=_htmx_messages(request))
             subject.save()
             dj_messages.success(request, f'Subject "{subject.name}" created.')
             if request.headers.get("HX-Request"):
@@ -136,6 +140,10 @@ class SubjectEditView(LoginRequiredMixin, View):
             updated = form.save(commit=False)
             if not updated.code:
                 updated.code = generate_subject_code(updated.name, updated.school)
+            if Subject.objects.filter(name__iexact=updated.name, school=school).exclude(pk=pk).exists():
+                dj_messages.error(request, f'A subject named "{updated.name}" already exists in this school.')
+                template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
+                return render(request, template, {"subject": subject, "form": form, "class_levels": ClassLevel.objects.filter(school=school)}, headers=_htmx_messages(request))
             updated.save()
             dj_messages.success(request, f'Subject "{updated.name}" updated.')
             if request.headers.get("HX-Request"):
@@ -247,7 +255,7 @@ class TopicCreateStandaloneView(LoginRequiredMixin, View):
                 if subject.school != request.user.school:
                     dj_messages.error(request, "Subject not found.")
                     if request.headers.get("HX-Request"):
-                        return render("subjects/_topic_form_content.html", {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
+                        return render(request, "subjects/_topic_form_content.html", {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
                     return redirect("topic-create")
             topic = form.save()
             dj_messages.success(request, f'Topic "{topic.name}" created under {subject.name}.')
@@ -287,7 +295,7 @@ class TopicEditView(LoginRequiredMixin, View):
             if not request.user.is_super_admin_role and subject.school != request.user.school:
                 dj_messages.error(request, "Subject not found.")
                 if request.headers.get("HX-Request"):
-                    return render("subjects/_topic_form_content.html", {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
+                    return render(request, "subjects/_topic_form_content.html", {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
                 return redirect("topic-list")
             form.save()
             dj_messages.success(request, f'Topic "{topic.name}" updated.')

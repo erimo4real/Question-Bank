@@ -88,7 +88,7 @@ class SchoolDeleteView(SuperAdminRequiredMixin, View):
     def post(self, request, pk):
         school = get_object_or_404(School, pk=pk)
         school.delete()
-        dj_dj_messages.success(request, "School deleted.")
+        dj_messages.success(request, "School deleted.")
         if request.headers.get("HX-Request"):
             return HttpResponse("", headers=_htmx_messages(request))
         return redirect("school-list")
@@ -204,7 +204,7 @@ class ClassLevelDeleteView(AdminRequiredMixin, View):
             class_level = get_object_or_404(ClassLevel, pk=pk, school=request.user.school)
         name = class_level.name
         class_level.delete()
-        dj_dj_messages.success(request, f'Class level "{name}" deleted.')
+        dj_messages.success(request, f'Class level "{name}" deleted.')
         if request.headers.get("HX-Request"):
             return HttpResponse("", headers=_htmx_messages(request))
         return redirect("classlevel-list")

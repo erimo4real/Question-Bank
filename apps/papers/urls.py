@@ -21,4 +21,6 @@ urlpatterns = [
     path("<uuid:pk>/export-pdf/", pv.PaperExportPdfView.as_view(), name="paper-export-pdf"),
     path("<uuid:pk>/export-docx/", pv.PaperExportDocxView.as_view(), name="paper-export-docx"),
     path("<uuid:pk>/print-view/", pv.PaperPrintView.as_view(), name="paper-print-view"),
+    # DRF API endpoints
+    path("api/", include(router.urls)),
 ]

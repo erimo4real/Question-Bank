@@ -16,4 +16,6 @@ urlpatterns = [
     path("import/", qv.QuestionImportView.as_view(), name="question-import"),
     path("bulk-delete/", qv.QuestionBulkDeleteView.as_view(), name="question-bulk-delete"),
     path("bulk-status/", qv.QuestionBulkStatusView.as_view(), name="question-bulk-status"),
+    # DRF API endpoints
+    path("api/", include(router.urls)),
 ]
