@@ -485,9 +485,15 @@ class QuestionViewSet(viewsets.ModelViewSet):
         if tag:
             qs = qs.filter(tags__contains=[tag])
         if min_marks:
-            qs = qs.filter(marks__gte=int(min_marks))
+            try:
+                qs = qs.filter(marks__gte=int(min_marks))
+            except (ValueError, TypeError):
+                pass
         if max_marks:
-            qs = qs.filter(marks__lte=int(max_marks))
+            try:
+                qs = qs.filter(marks__lte=int(max_marks))
+            except (ValueError, TypeError):
+                pass
         return qs
 
     def get_serializer_class(self):

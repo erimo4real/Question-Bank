@@ -582,7 +582,7 @@ class ExamPaperViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"], url_path="random-questions")
     def random_questions(self, request, pk=None):
         paper = self.get_object()
-        count = int(request.query_params.get("count", 10))
+        count = _safe_int(request.query_params.get("count", 10), 10)
         difficulty = request.query_params.get("difficulty")
         topic = request.query_params.get("topic")
         qs = Question.objects.filter(school=paper.school, subject=paper.subject, status="published")
@@ -598,9 +598,9 @@ class ExamPaperViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="auto-fill")
     def auto_fill(self, request, pk=None):
         paper = self.get_object()
-        easy_count = int(request.data.get("easy", 0))
-        medium_count = int(request.data.get("medium", 0))
-        hard_count = int(request.data.get("hard", 0))
+        easy_count = _safe_int(request.data.get("easy", 0))
+        medium_count = _safe_int(request.data.get("medium", 0))
+        hard_count = _safe_int(request.data.get("hard", 0))
         added = 0
         order = paper.paper_questions.count()
         existing = ExamPaperQuestion.objects.filter(exam_paper=paper).values_list("question_id", flat=True)
