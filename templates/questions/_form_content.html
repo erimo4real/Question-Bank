@@ -187,12 +187,12 @@
     <script>
     function questionForm() {
         return {
-            qType: '{{ question.question_type|default:"mcq" }}',
-            subjectId: '{{ question.subject_id|default:"" }}',
-            options: [{% for o in question.options %}'{{ o }}'{% if not forloop.last %},{% endif %}{% endfor %}{% if not question.options %}'', '', '', ''{% endif %}],
-            answers: [{% for a in question.correct_answer %}'{{ a }}'{% if not forloop.last %},{% endif %}{% endfor %}{% if not question.correct_answer %}{% endif %}],
+            qType: '{{ question.question_type|default:"mcq"|escapejs }}',
+            subjectId: '{{ question.subject_id|default:""|escapejs }}',
+            options: [{% for o in question.options %}'{{ o|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}{% if not question.options %}'', '', '', ''{% endif %}],
+            answers: [{% for a in question.correct_answer %}'{{ a|escapejs }}'{% if not forloop.last %},{% endif %}{% endfor %}{% if not question.correct_answer %}{% endif %}],
             topicOptions: [],
-            selectedTopic: '{{ question.topic_id|default:"" }}',
+            selectedTopic: '{{ question.topic_id|default:""|escapejs }}',
             init() {
                 if (this.subjectId) this.loadTopics();
             },

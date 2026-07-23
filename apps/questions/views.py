@@ -6,7 +6,7 @@ from django.contrib import messages as dj_messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -86,6 +86,7 @@ class QuestionListView(LoginRequiredMixin, View):
 
         published_count = qs.filter(status="published").count()
         draft_count = qs.filter(status="draft").count()
+        total_marks = qs.aggregate(total=Sum("marks"))["total"] or 0
 
         paginator_obj = Paginator(qs, 20)
         page = request.GET.get("page")
@@ -107,6 +108,7 @@ class QuestionListView(LoginRequiredMixin, View):
             "status_choices": Question.STATUS_CHOICES,
             "published_count": published_count,
             "draft_count": draft_count,
+            "total_marks": total_marks,
             "paginator": paginator_obj,
         }
         template = "questions/_list_content.html" if request.headers.get("HX-Request") else "questions/list.html"
@@ -414,6 +416,7 @@ class QuestionBulkDeleteView(LoginRequiredMixin, View):
             qs = qs.filter(class_level_id=class_level_filter)
         published_count = qs.filter(status="published").count()
         draft_count = qs.filter(status="draft").count()
+        total_marks = qs.aggregate(total=Sum("marks"))["total"] or 0
         paginator_obj = Paginator(qs, 20)
         page = request.GET.get("page")
         try:
@@ -429,7 +432,7 @@ class QuestionBulkDeleteView(LoginRequiredMixin, View):
             "type_choices": Question.TYPE_CHOICES,
             "difficulty_choices": Question.DIFFICULTY_CHOICES,
             "status_choices": Question.STATUS_CHOICES,
-            "published_count": published_count, "draft_count": draft_count, "paginator": paginator_obj,
+            "published_count": published_count, "draft_count": draft_count, "total_marks": total_marks, "paginator": paginator_obj,
         }
         return render(request, "questions/_list_content.html", ctx, headers=_htmx_messages(request))
 

@@ -349,10 +349,25 @@ class SchoolForm(forms.ModelForm):
             }
         ),
     )
+    email = forms.EmailField(
+        required=False,
+        widget=forms.EmailInput(
+            attrs={
+                "class": "block w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500/20 transition-all duration-200",
+                "placeholder": "School email",
+            }
+        ),
+    )
+    logo = forms.ImageField(
+        required=False,
+        widget=forms.ClearableFileInput(
+            attrs={"class": "block w-full text-sm text-gray-500 file:mr-3 file:rounded-xl file:border-0 file:bg-primary-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-primary-700 hover:file:bg-primary-100"}
+        ),
+    )
 
     class Meta:
         model = School
-        fields = ["name", "address", "phone"]
+        fields = ["name", "address", "phone", "email", "logo"]
 
     def clean_name(self):
         name = self.cleaned_data.get("name")

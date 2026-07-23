@@ -53,7 +53,7 @@ class SchoolCreateView(SuperAdminRequiredMixin, View):
         return render(request, template, {"school": None, "form": form})
 
     def post(self, request):
-        form = SchoolForm(request.POST)
+        form = SchoolForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
             dj_messages.success(request, "School created!")
@@ -73,7 +73,7 @@ class SchoolEditView(SuperAdminRequiredMixin, View):
 
     def post(self, request, pk):
         school = get_object_or_404(School, pk=pk)
-        form = SchoolForm(request.POST, instance=school)
+        form = SchoolForm(request.POST, request.FILES, instance=school)
         if form.is_valid():
             form.save()
             dj_messages.success(request, "School updated!")
