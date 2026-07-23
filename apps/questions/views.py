@@ -9,6 +9,7 @@ from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views import View
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -172,7 +173,7 @@ class QuestionCreateView(LoginRequiredMixin, View):
             q.save()
             dj_messages.success(request, "Question created successfully!")
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": f"/questions/{q.pk}/edit/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("question-edit", args=[q.pk])})
             return redirect("question-edit", pk=q.pk)
         ctx = self._get_context(request)
         template = "questions/_form_content.html" if request.headers.get("HX-Request") else "questions/form.html"
@@ -252,7 +253,7 @@ class QuestionEditView(LoginRequiredMixin, View):
             q.save()
             dj_messages.success(request, "Question updated!")
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": f"/questions/{question.pk}/edit/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("question-edit", args=[question.pk])})
             return redirect("question-edit", pk=question.pk)
         ctx = self._get_context(request)
         template = "questions/_form_content.html" if request.headers.get("HX-Request") else "questions/form.html"
@@ -359,7 +360,7 @@ class QuestionImportView(LoginRequiredMixin, View):
         if errors:
             dj_messages.warning(request, f"{len(errors)} errors: {'; '.join(errors[:5])}")
         if request.headers.get("HX-Request"):
-            return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/questions/"})
+            return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("question-list")})
         return redirect("question-list")
 
 

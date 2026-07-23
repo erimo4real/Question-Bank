@@ -6,6 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views import View
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -124,7 +125,7 @@ class PaperCreateView(LoginRequiredMixin, View):
             paper.save()
             dj_messages.success(request, f'Paper "{paper.title}" created. Now add questions!')
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": f"/papers/{paper.pk}/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("paper-detail", args=[paper.pk])})
             return redirect("paper-detail", pk=paper.pk)
         ctx = self._get_context(request)
         template = "papers/_form_content.html" if request.headers.get("HX-Request") else "papers/form.html"
@@ -223,7 +224,7 @@ class PaperEditView(LoginRequiredMixin, View):
             form.save()
             dj_messages.success(request, "Paper updated!")
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": f"/papers/{paper.pk}/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("paper-detail", args=[paper.pk])})
             return redirect("paper-detail", pk=paper.pk)
         ctx = self._get_context(request)
         template = "papers/_form_content.html" if request.headers.get("HX-Request") else "papers/form.html"

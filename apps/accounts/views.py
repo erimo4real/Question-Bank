@@ -8,6 +8,7 @@ from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views import View
 from rest_framework import generics, permissions, status
@@ -123,7 +124,7 @@ class SettingsTemplateView(LoginRequiredMixin, View):
             user.save()
             dj_messages.success(request, "Profile updated!")
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/settings/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("settings")})
             return redirect("settings")
         password_form = PasswordChangeForm(user=request.user)
         if request.headers.get("HX-Request"):
@@ -138,7 +139,7 @@ class ProfilePasswordChangeView(LoginRequiredMixin, View):
             form.save()
             dj_messages.success(request, "Password changed successfully!")
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/settings/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("settings")})
             return redirect("settings")
         dj_messages.error(request, "Please correct the errors below.")
         settings_form = SettingsForm(instance=request.user)
@@ -275,7 +276,7 @@ class UserCreateView(AdminRequiredMixin, View):
                 user.subjects.set(form.cleaned_data["subjects"])
             dj_messages.success(request, f'User "{user.email}" created.')
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/users/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("user-list")})
             return redirect("user-list")
         if request.user.is_super_admin_role:
             schools = School.objects.all().order_by("name")
@@ -331,7 +332,7 @@ class UserEditView(AdminRequiredMixin, View):
                 user.subjects.clear()
             dj_messages.success(request, f'User "{user.email}" updated.')
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/users/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("user-list")})
             return redirect("user-list")
         if request.user.is_super_admin_role:
             schools = School.objects.all().order_by("name")

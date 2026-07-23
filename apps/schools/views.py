@@ -6,6 +6,7 @@ from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views import View
 from rest_framework import viewsets
 
@@ -57,7 +58,7 @@ class SchoolCreateView(SuperAdminRequiredMixin, View):
             form.save()
             dj_messages.success(request, "School created!")
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/schools/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("school-list")})
             return redirect("school-list")
         template = "schools/_form_content.html" if request.headers.get("HX-Request") else "schools/form.html"
         return render(request, template, {"school": None, "form": form}, headers=_htmx_messages(request))
@@ -77,7 +78,7 @@ class SchoolEditView(SuperAdminRequiredMixin, View):
             form.save()
             dj_messages.success(request, "School updated!")
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/schools/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("school-list")})
             return redirect("school-list")
         template = "schools/_form_content.html" if request.headers.get("HX-Request") else "schools/form.html"
         return render(request, template, {"school": school, "form": form}, headers=_htmx_messages(request))
@@ -159,7 +160,7 @@ class ClassLevelCreateView(AdminRequiredMixin, View):
             form.save()
             dj_messages.success(request, f'Class level "{form.cleaned_data["name"]}" created!')
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/classlevels/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("classlevel-list")})
             return redirect("classlevel-list")
         template = "schools/_classlevel_form_content.html" if request.headers.get("HX-Request") else "schools/classlevel_form.html"
         return render(request, template, {"class_level": None, "form": form}, headers=_htmx_messages(request))
@@ -189,7 +190,7 @@ class ClassLevelEditView(AdminRequiredMixin, View):
             form.save()
             dj_messages.success(request, f'Class level "{class_level.name}" updated!')
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/classlevels/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("classlevel-list")})
             return redirect("classlevel-list")
         template = "schools/_classlevel_form_content.html" if request.headers.get("HX-Request") else "schools/classlevel_form.html"
         return render(request, template, {"class_level": class_level, "form": form}, headers=_htmx_messages(request))

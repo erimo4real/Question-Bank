@@ -6,6 +6,7 @@ from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views import View
 from rest_framework import viewsets
 
@@ -95,7 +96,7 @@ class SubjectCreateView(LoginRequiredMixin, View):
             subject.save()
             dj_messages.success(request, f'Subject "{subject.name}" created.')
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/subjects/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("subject-list")})
             return redirect("subject-list")
         class_levels = ClassLevel.objects.filter(school=school) if school else ClassLevel.objects.all()
         template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
@@ -138,7 +139,7 @@ class SubjectEditView(LoginRequiredMixin, View):
             updated.save()
             dj_messages.success(request, f'Subject "{updated.name}" updated.')
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/subjects/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("subject-list")})
             return redirect("subject-list")
         class_levels = ClassLevel.objects.filter(school=school) if school else ClassLevel.objects.all()
         template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
@@ -251,7 +252,7 @@ class TopicCreateStandaloneView(LoginRequiredMixin, View):
             topic = form.save()
             dj_messages.success(request, f'Topic "{topic.name}" created under {subject.name}.')
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/topics/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("topic-list")})
             return redirect("topic-list")
         template = "subjects/_topic_form_content.html" if request.headers.get("HX-Request") else "subjects/topic_form.html"
         return render(request, template, {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
@@ -291,7 +292,7 @@ class TopicEditView(LoginRequiredMixin, View):
             form.save()
             dj_messages.success(request, f'Topic "{topic.name}" updated.')
             if request.headers.get("HX-Request"):
-                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/topics/"})
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": reverse("topic-list")})
             return redirect("topic-list")
         template = "subjects/_topic_form_content.html" if request.headers.get("HX-Request") else "subjects/topic_form.html"
         return render(request, template, {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
