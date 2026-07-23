@@ -1,7 +1,10 @@
-from django.contrib import messages
+import json
+
+from django.contrib import messages as dj_messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from rest_framework import viewsets
@@ -12,6 +15,12 @@ from apps.accounts.permissions import AdminRequiredMixin, IsAdminOrTeacher, Supe
 from .forms import ClassLevelForm
 from .models import ClassLevel, School
 from .serializers import SchoolSerializer
+
+
+def _htmx_messages(request):
+    """Return X-Messages header dict for HTMX responses."""
+    msgs = [{"text": str(m), "tag": m.tags} for m in dj_messages.get_messages(request)]
+    return {"X-Messages": json.dumps(msgs)}
 
 
 class SchoolListView(SuperAdminRequiredMixin, View):
@@ -31,44 +40,56 @@ class SchoolListView(SuperAdminRequiredMixin, View):
         except EmptyPage:
             page_obj = paginator.page(paginator.num_pages)
 
-        return render(request, "schools/list.html", {"schools": page_obj, "page_obj": page_obj, "q": q})
+        ctx = {"schools": page_obj, "page_obj": page_obj, "q": q}
+        template = "schools/_list_content.html" if request.headers.get("HX-Request") else "schools/list.html"
+        return render(request, template, ctx)
 
 
 class SchoolCreateView(SuperAdminRequiredMixin, View):
     def get(self, request):
         form = SchoolForm()
-        return render(request, "schools/form.html", {"school": None, "form": form})
+        template = "schools/_form_content.html" if request.headers.get("HX-Request") else "schools/form.html"
+        return render(request, template, {"school": None, "form": form})
 
     def post(self, request):
         form = SchoolForm(request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, "School created!")
+            dj_messages.success(request, "School created!")
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/schools/"})
             return redirect("school-list")
-        return render(request, "schools/form.html", {"school": None, "form": form})
+        template = "schools/_form_content.html" if request.headers.get("HX-Request") else "schools/form.html"
+        return render(request, template, {"school": None, "form": form}, headers=_htmx_messages(request))
 
 
 class SchoolEditView(SuperAdminRequiredMixin, View):
     def get(self, request, pk):
         school = get_object_or_404(School, pk=pk)
         form = SchoolForm(instance=school)
-        return render(request, "schools/form.html", {"school": school, "form": form})
+        template = "schools/_form_content.html" if request.headers.get("HX-Request") else "schools/form.html"
+        return render(request, template, {"school": school, "form": form})
 
     def post(self, request, pk):
         school = get_object_or_404(School, pk=pk)
         form = SchoolForm(request.POST, instance=school)
         if form.is_valid():
             form.save()
-            messages.success(request, "School updated!")
+            dj_messages.success(request, "School updated!")
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/schools/"})
             return redirect("school-list")
-        return render(request, "schools/form.html", {"school": school, "form": form})
+        template = "schools/_form_content.html" if request.headers.get("HX-Request") else "schools/form.html"
+        return render(request, template, {"school": school, "form": form}, headers=_htmx_messages(request))
 
 
 class SchoolDeleteView(SuperAdminRequiredMixin, View):
     def post(self, request, pk):
         school = get_object_or_404(School, pk=pk)
         school.delete()
-        messages.success(request, "School deleted.")
+        dj_dj_messages.success(request, "School deleted.")
+        if request.headers.get("HX-Request"):
+            return HttpResponse("", headers=_htmx_messages(request))
         return redirect("school-list")
 
 
@@ -110,10 +131,12 @@ class ClassLevelListView(AdminRequiredMixin, View):
         else:
             schools = School.objects.filter(pk=request.user.school_id)
 
-        return render(request, "schools/classlevel_list.html", {
+        ctx = {
             "class_levels": page_obj, "page_obj": page_obj, "q": q, "school_filter": school_filter,
             "schools": schools,
-        })
+        }
+        template = "schools/_classlevel_list_content.html" if request.headers.get("HX-Request") else "schools/classlevel_list.html"
+        return render(request, template, ctx)
 
 
 class ClassLevelCreateView(AdminRequiredMixin, View):
@@ -123,7 +146,8 @@ class ClassLevelCreateView(AdminRequiredMixin, View):
         else:
             school_queryset = School.objects.filter(pk=request.user.school_id)
         form = ClassLevelForm(school_queryset=school_queryset)
-        return render(request, "schools/classlevel_form.html", {"class_level": None, "form": form})
+        template = "schools/_classlevel_form_content.html" if request.headers.get("HX-Request") else "schools/classlevel_form.html"
+        return render(request, template, {"class_level": None, "form": form})
 
     def post(self, request):
         if request.user.is_super_admin_role:
@@ -133,9 +157,12 @@ class ClassLevelCreateView(AdminRequiredMixin, View):
         form = ClassLevelForm(request.POST, school_queryset=school_queryset)
         if form.is_valid():
             form.save()
-            messages.success(request, f'Class level "{form.cleaned_data["name"]}" created!')
+            dj_messages.success(request, f'Class level "{form.cleaned_data["name"]}" created!')
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/classlevels/"})
             return redirect("classlevel-list")
-        return render(request, "schools/classlevel_form.html", {"class_level": None, "form": form})
+        template = "schools/_classlevel_form_content.html" if request.headers.get("HX-Request") else "schools/classlevel_form.html"
+        return render(request, template, {"class_level": None, "form": form}, headers=_htmx_messages(request))
 
 
 class ClassLevelEditView(AdminRequiredMixin, View):
@@ -147,7 +174,8 @@ class ClassLevelEditView(AdminRequiredMixin, View):
             class_level = get_object_or_404(ClassLevel, pk=pk, school=request.user.school)
             school_queryset = School.objects.filter(pk=request.user.school_id)
         form = ClassLevelForm(instance=class_level, school_queryset=school_queryset)
-        return render(request, "schools/classlevel_form.html", {"class_level": class_level, "form": form})
+        template = "schools/_classlevel_form_content.html" if request.headers.get("HX-Request") else "schools/classlevel_form.html"
+        return render(request, template, {"class_level": class_level, "form": form})
 
     def post(self, request, pk):
         if request.user.is_super_admin_role:
@@ -159,9 +187,12 @@ class ClassLevelEditView(AdminRequiredMixin, View):
         form = ClassLevelForm(request.POST, instance=class_level, school_queryset=school_queryset)
         if form.is_valid():
             form.save()
-            messages.success(request, f'Class level "{class_level.name}" updated!')
+            dj_messages.success(request, f'Class level "{class_level.name}" updated!')
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/classlevels/"})
             return redirect("classlevel-list")
-        return render(request, "schools/classlevel_form.html", {"class_level": class_level, "form": form})
+        template = "schools/_classlevel_form_content.html" if request.headers.get("HX-Request") else "schools/classlevel_form.html"
+        return render(request, template, {"class_level": class_level, "form": form}, headers=_htmx_messages(request))
 
 
 class ClassLevelDeleteView(AdminRequiredMixin, View):
@@ -172,5 +203,7 @@ class ClassLevelDeleteView(AdminRequiredMixin, View):
             class_level = get_object_or_404(ClassLevel, pk=pk, school=request.user.school)
         name = class_level.name
         class_level.delete()
-        messages.success(request, f'Class level "{name}" deleted.')
+        dj_dj_messages.success(request, f'Class level "{name}" deleted.')
+        if request.headers.get("HX-Request"):
+            return HttpResponse("", headers=_htmx_messages(request))
         return redirect("classlevel-list")

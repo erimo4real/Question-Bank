@@ -1,16 +1,14 @@
+{% load question_tags %}
 {% if page_obj.has_other_pages %}
 <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-5 border-t border-gray-100">
-    <!-- Results count -->
     <p class="text-sm text-gray-500 font-medium">
         Showing <span class="font-semibold text-gray-700">{{ page_obj.start_index }}</span>–<span class="font-semibold text-gray-700">{{ page_obj.end_index }}</span> of <span class="font-semibold text-gray-700">{{ paginator.count }}</span> results
     </p>
 
-    <!-- Page controls -->
     <nav class="flex items-center gap-1.5 bg-gray-50 rounded-2xl p-1.5 border border-gray-100">
-        <!-- First page -->
         {% if page_obj.number > 1 %}
-        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page=1"
-           class="p-2 rounded-xl text-gray-400 hover:text-primary-600 hover:bg-white hover:shadow-sm transition-all duration-200" title="First page">
+        <a hx-get="{% append_page 1 %}" hx-target="#list-content" hx-swap="innerHTML" hx-push-url="true"
+           class="p-2 rounded-xl text-gray-400 hover:text-primary-600 hover:bg-white hover:shadow-sm transition-all duration-200 cursor-pointer" title="First page">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
         </a>
         {% else %}
@@ -19,10 +17,9 @@
         </span>
         {% endif %}
 
-        <!-- Previous -->
         {% if page_obj.has_previous %}
-        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.previous_page_number }}"
-           class="p-2 rounded-xl text-gray-500 hover:text-primary-600 hover:bg-white hover:shadow-sm transition-all duration-200" title="Previous page">
+        <a hx-get="{% append_page page_obj.previous_page_number %}" hx-target="#list-content" hx-swap="innerHTML" hx-push-url="true"
+           class="p-2 rounded-xl text-gray-500 hover:text-primary-600 hover:bg-white hover:shadow-sm transition-all duration-200 cursor-pointer" title="Previous page">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
         </a>
         {% else %}
@@ -31,7 +28,6 @@
         </span>
         {% endif %}
 
-        <!-- Page numbers -->
         <div class="flex items-center gap-1 px-1">
             {% for num in page_obj.paginator.page_range %}
                 {% if page_obj.number == num %}
@@ -41,16 +37,15 @@
                 {% elif num == page_obj.number|add:'4' and num < page_obj.paginator.num_pages %}
                 <span class="px-1 text-gray-300 select-none">...</span>
                 {% elif num > page_obj.number|add:'-4' and num < page_obj.number|add:'4' %}
-                <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ num }}"
-                   class="min-w-[36px] h-9 flex items-center justify-center rounded-xl text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-white hover:shadow-sm transition-all duration-200">{{ num }}</a>
+                <a hx-get="{% append_page num %}" hx-target="#list-content" hx-swap="innerHTML" hx-push-url="true"
+                   class="min-w-[36px] h-9 flex items-center justify-center rounded-xl text-sm font-medium text-gray-600 hover:text-primary-600 hover:bg-white hover:shadow-sm transition-all duration-200 cursor-pointer">{{ num }}</a>
                 {% endif %}
             {% endfor %}
         </div>
 
-        <!-- Next -->
         {% if page_obj.has_next %}
-        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.next_page_number }}"
-           class="p-2 rounded-xl text-gray-500 hover:text-primary-600 hover:bg-white hover:shadow-sm transition-all duration-200" title="Next page">
+        <a hx-get="{% append_page page_obj.next_page_number %}" hx-target="#list-content" hx-swap="innerHTML" hx-push-url="true"
+           class="p-2 rounded-xl text-gray-500 hover:text-primary-600 hover:bg-white hover:shadow-sm transition-all duration-200 cursor-pointer" title="Next page">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
         </a>
         {% else %}
@@ -59,10 +54,9 @@
         </span>
         {% endif %}
 
-        <!-- Last page -->
         {% if page_obj.number < page_obj.paginator.num_pages %}
-        <a href="?{% for key, value in request.GET.items %}{% if key != 'page' %}{{ key }}={{ value }}&{% endif %}{% endfor %}page={{ page_obj.paginator.num_pages }}"
-           class="p-2 rounded-xl text-gray-400 hover:text-primary-600 hover:bg-white hover:shadow-sm transition-all duration-200" title="Last page">
+        <a hx-get="{% append_page page_obj.paginator.num_pages %}" hx-target="#list-content" hx-swap="innerHTML" hx-push-url="true"
+           class="p-2 rounded-xl text-gray-400 hover:text-primary-600 hover:bg-white hover:shadow-sm transition-all duration-200 cursor-pointer" title="Last page">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7m-8-14l7 7-7 7"/></svg>
         </a>
         {% else %}

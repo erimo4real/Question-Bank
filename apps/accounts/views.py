@@ -1,9 +1,12 @@
-from django.contrib import messages
+import json
+
+from django.contrib import messages as dj_messages
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.tokens import default_token_generator
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from django.views import View
@@ -28,6 +31,11 @@ from apps.accounts.serializers import (
 )
 
 User = get_user_model()
+
+
+def _htmx_messages(request):
+    msgs = [{"text": str(m), "tag": m.tags} for m in dj_messages.get_messages(request)]
+    return {"X-Messages": json.dumps(msgs)}
 
 
 class RootRedirectView(View):
@@ -60,7 +68,7 @@ class LoginTemplateView(View):
                 else:
                     request.session.set_expiry(0)  # browser close
                 return redirect("dashboard")
-        messages.error(request, "Invalid email or password.")
+        dj_messages.error(request, "Invalid email or password.")
         return render(request, "accounts/login.html", {"form": form})
 
 
@@ -78,9 +86,9 @@ class RegisterTemplateView(View):
             user.role = "teacher"
             user.save()
             login(request, user)
-            messages.success(request, "Account created successfully!")
+            dj_messages.success(request, "Account created successfully!")
             return redirect("dashboard")
-        messages.error(request, "Please correct the errors below.")
+        dj_messages.error(request, "Please correct the errors below.")
         return render(request, "accounts/register.html", {"form": form})
 
 
@@ -99,7 +107,10 @@ class SettingsTemplateView(LoginRequiredMixin, View):
     def get(self, request):
         form = SettingsForm(instance=request.user)
         password_form = PasswordChangeForm(user=request.user)
-        return render(request, "accounts/settings.html", {"form": form, "password_form": password_form})
+        template = "accounts/settings.html"
+        if request.headers.get("HX-Request"):
+            template = "accounts/_profile_form_content.html"
+        return render(request, template, {"form": form, "password_form": password_form})
 
     def post(self, request):
         form = SettingsForm(request.POST, request.FILES, instance=request.user)
@@ -110,9 +121,13 @@ class SettingsTemplateView(LoginRequiredMixin, View):
                     user.avatar.delete(save=False)
                     user.avatar = None
             user.save()
-            messages.success(request, "Profile updated!")
+            dj_messages.success(request, "Profile updated!")
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/settings/"})
             return redirect("settings")
         password_form = PasswordChangeForm(user=request.user)
+        if request.headers.get("HX-Request"):
+            return render(request, "accounts/_profile_form_content.html", {"form": form, "password_form": password_form}, headers=_htmx_messages(request))
         return render(request, "accounts/settings.html", {"form": form, "password_form": password_form})
 
 
@@ -121,10 +136,14 @@ class ProfilePasswordChangeView(LoginRequiredMixin, View):
         form = PasswordChangeForm(user=request.user, data=request.POST)
         if form.is_valid():
             form.save()
-            messages.success(request, "Password changed successfully!")
+            dj_messages.success(request, "Password changed successfully!")
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/settings/"})
             return redirect("settings")
-        messages.error(request, "Please correct the errors below.")
+        dj_messages.error(request, "Please correct the errors below.")
         settings_form = SettingsForm(instance=request.user)
+        if request.headers.get("HX-Request"):
+            return render(request, "accounts/_password_form_content.html", {"form": settings_form, "password_form": form}, headers=_htmx_messages(request))
         return render(request, "accounts/settings.html", {"form": settings_form, "password_form": form})
 
 
@@ -146,9 +165,9 @@ class PasswordResetRequestView(View):
                 print(f"PASSWORD RESET LINK for {user.email}:")
                 print(f"{reset_url}")
                 print(f"{'='*60}\n")
-            messages.success(request, "If an account exists with that email, a reset link has been sent.")
+            dj_messages.success(request, "If an account exists with that email, a reset link has been sent.")
         else:
-            messages.success(request, "If an account exists with that email, a reset link has been sent.")
+            dj_messages.success(request, "If an account exists with that email, a reset link has been sent.")
         return redirect("password-reset-done")
 
 
@@ -181,7 +200,7 @@ class PasswordResetConfirmView(View):
         if form.is_valid():
             form.save()
             return redirect("password-reset-complete")
-        messages.error(request, "Please correct the errors below.")
+        dj_messages.error(request, "Please correct the errors below.")
         return render(request, "accounts/password_reset_confirm.html", {
             "validlink": True, "uidb64": uidb64, "token": token, "form": form,
         })
@@ -220,10 +239,12 @@ class UserListView(AdminRequiredMixin, View):
         except EmptyPage:
             page_obj = paginator.page(paginator.num_pages)
 
-        return render(request, "accounts/user_list.html", {
+        ctx = {
             "users": page_obj, "page_obj": page_obj, "q": q, "role_filter": role_filter,
             "role_choices": User.ROLE_CHOICES,
-        })
+        }
+        template = "accounts/_user_list_content.html" if request.headers.get("HX-Request") else "accounts/user_list.html"
+        return render(request, template, ctx)
 
 
 class UserCreateView(AdminRequiredMixin, View):
@@ -236,7 +257,8 @@ class UserCreateView(AdminRequiredMixin, View):
         else:
             schools = School.objects.filter(pk=request.user.school_id)
             subjects = Subject.objects.filter(school=request.user.school)
-        return render(request, "accounts/user_form.html", {
+        template = "accounts/_user_form_content.html" if request.headers.get("HX-Request") else "accounts/user_form.html"
+        return render(request, template, {
             "edit_user": None, "form": form, "schools": schools, "subjects": subjects,
         })
 
@@ -251,7 +273,9 @@ class UserCreateView(AdminRequiredMixin, View):
             form.save_m2m()
             if user.role == "teacher" and form.cleaned_data.get("subjects"):
                 user.subjects.set(form.cleaned_data["subjects"])
-            messages.success(request, f'User "{user.email}" created.')
+            dj_messages.success(request, f'User "{user.email}" created.')
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/users/"})
             return redirect("user-list")
         if request.user.is_super_admin_role:
             schools = School.objects.all().order_by("name")
@@ -259,9 +283,10 @@ class UserCreateView(AdminRequiredMixin, View):
         else:
             schools = School.objects.filter(pk=request.user.school_id)
             subjects = Subject.objects.filter(school=request.user.school)
-        return render(request, "accounts/user_form.html", {
+        template = "accounts/_user_form_content.html" if request.headers.get("HX-Request") else "accounts/user_form.html"
+        return render(request, template, {
             "edit_user": None, "form": form, "schools": schools, "subjects": subjects,
-        })
+        }, headers=_htmx_messages(request))
 
 
 class UserEditView(AdminRequiredMixin, View):
@@ -269,7 +294,9 @@ class UserEditView(AdminRequiredMixin, View):
         from apps.subjects.models import Subject
         edit_user = get_object_or_404(User, pk=pk)
         if not request.user.is_super_admin_role and edit_user.school != request.user.school:
-            messages.error(request, "You cannot edit users from other schools.")
+            dj_messages.error(request, "You cannot edit users from other schools.")
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers=_htmx_messages(request))
             return redirect("user-list")
         form = UserForm(instance=edit_user, is_edit=True)
         if request.user.is_super_admin_role:
@@ -278,7 +305,8 @@ class UserEditView(AdminRequiredMixin, View):
         else:
             schools = School.objects.filter(pk=request.user.school_id)
             subjects = Subject.objects.filter(school=request.user.school)
-        return render(request, "accounts/user_form.html", {
+        template = "accounts/_user_form_content.html" if request.headers.get("HX-Request") else "accounts/user_form.html"
+        return render(request, template, {
             "edit_user": edit_user, "form": form, "schools": schools, "subjects": subjects,
         })
 
@@ -286,7 +314,9 @@ class UserEditView(AdminRequiredMixin, View):
         from apps.subjects.models import Subject
         edit_user = get_object_or_404(User, pk=pk)
         if not request.user.is_super_admin_role and edit_user.school != request.user.school:
-            messages.error(request, "You cannot edit users from other schools.")
+            dj_messages.error(request, "You cannot edit users from other schools.")
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers=_htmx_messages(request))
             return redirect("user-list")
         form = UserForm(request.POST, instance=edit_user, is_edit=True)
         if form.is_valid():
@@ -299,7 +329,9 @@ class UserEditView(AdminRequiredMixin, View):
                 user.subjects.set(form.cleaned_data["subjects"])
             else:
                 user.subjects.clear()
-            messages.success(request, f'User "{user.email}" updated.')
+            dj_messages.success(request, f'User "{user.email}" updated.')
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/users/"})
             return redirect("user-list")
         if request.user.is_super_admin_role:
             schools = School.objects.all().order_by("name")
@@ -307,23 +339,30 @@ class UserEditView(AdminRequiredMixin, View):
         else:
             schools = School.objects.filter(pk=request.user.school_id)
             subjects = Subject.objects.filter(school=request.user.school)
-        return render(request, "accounts/user_form.html", {
+        template = "accounts/_user_form_content.html" if request.headers.get("HX-Request") else "accounts/user_form.html"
+        return render(request, template, {
             "edit_user": edit_user, "form": form, "schools": schools, "subjects": subjects,
-        })
+        }, headers=_htmx_messages(request))
 
 
 class UserDeleteView(AdminRequiredMixin, View):
     def post(self, request, pk):
         user = get_object_or_404(User, pk=pk)
         if not request.user.is_super_admin_role and user.school != request.user.school:
-            messages.error(request, "You cannot delete users from other schools.")
+            dj_messages.error(request, "You cannot delete users from other schools.")
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers=_htmx_messages(request))
             return redirect("user-list")
         if user.pk == request.user.pk:
-            messages.error(request, "You cannot delete your own account.")
+            dj_messages.error(request, "You cannot delete your own account.")
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers=_htmx_messages(request))
             return redirect("user-list")
         email = user.email
         user.delete()
-        messages.success(request, f'User "{email}" deleted.')
+        dj_messages.success(request, f'User "{email}" deleted.')
+        if request.headers.get("HX-Request"):
+            return HttpResponse("", headers=_htmx_messages(request))
         return redirect("user-list")
 
 

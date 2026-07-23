@@ -1,8 +1,10 @@
+import json
 import random
 
-from django.contrib import messages
+from django.contrib import messages as dj_messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from rest_framework import status, viewsets
@@ -21,6 +23,11 @@ from .serializers import (
     ExamPaperQuestionSerializer,
     ExamPaperSerializer,
 )
+
+
+def _htmx_messages(request):
+    msgs = [{"text": str(m), "tag": m.tags} for m in dj_messages.get_messages(request)]
+    return {"X-Messages": json.dumps(msgs)}
 
 
 # ─── Template Views ───────────────────────────────────────────────
@@ -61,11 +68,13 @@ class PaperListView(LoginRequiredMixin, View):
         except EmptyPage:
             page_obj = paginator.page(paginator.num_pages)
 
-        return render(request, "papers/list.html", {
+        ctx = {
             "papers": page_obj, "page_obj": page_obj, "subjects": subjects,
             "class_levels": class_levels,
             "q": q, "subject_filter": subject_filter, "class_level_filter": class_level_filter,
-        })
+        }
+        template = "papers/_list_content.html" if request.headers.get("HX-Request") else "papers/list.html"
+        return render(request, template, ctx)
 
 
 class PaperCreateView(LoginRequiredMixin, View):
@@ -91,7 +100,8 @@ class PaperCreateView(LoginRequiredMixin, View):
         school = self._get_school(request)
         form = PaperForm(school=school)
         ctx = self._get_context(request)
-        return render(request, "papers/form.html", {"paper": None, "form": form, **ctx})
+        template = "papers/_form_content.html" if request.headers.get("HX-Request") else "papers/form.html"
+        return render(request, template, {"paper": None, "form": form, **ctx})
 
     def post(self, request):
         school = self._get_school(request)
@@ -99,19 +109,26 @@ class PaperCreateView(LoginRequiredMixin, View):
         if form.is_valid():
             subject = form.cleaned_data["subject"]
             if not request.user.is_super_admin_role and subject.school != request.user.school:
-                messages.error(request, "Subject not found.")
+                dj_messages.error(request, "Subject not found.")
+                if request.headers.get("HX-Request"):
+                    return HttpResponse("", headers=_htmx_messages(request))
                 return redirect("paper-create")
             if request.user.is_teacher_role and subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
+                if request.headers.get("HX-Request"):
+                    return HttpResponse("", headers=_htmx_messages(request))
                 return redirect("paper-create")
             paper = form.save(commit=False)
             paper.school = subject.school
             paper.created_by = request.user
             paper.save()
-            messages.success(request, f'Paper "{paper.title}" created. Now add questions!')
+            dj_messages.success(request, f'Paper "{paper.title}" created. Now add questions!')
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": f"/papers/{paper.pk}/"})
             return redirect("paper-detail", pk=paper.pk)
         ctx = self._get_context(request)
-        return render(request, "papers/form.html", {"paper": None, "form": form, **ctx})
+        template = "papers/_form_content.html" if request.headers.get("HX-Request") else "papers/form.html"
+        return render(request, template, {"paper": None, "form": form, **ctx}, headers=_htmx_messages(request))
 
 
 class PaperDetailView(LoginRequiredMixin, View):
@@ -121,7 +138,7 @@ class PaperDetailView(LoginRequiredMixin, View):
         else:
             paper = get_object_or_404(ExamPaper, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
         pqs = paper.paper_questions.select_related("question__topic").order_by("order")
         if request.user.is_super_admin_role:
@@ -176,12 +193,13 @@ class PaperEditView(LoginRequiredMixin, View):
         else:
             paper = get_object_or_404(ExamPaper, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
         school = paper.school
         form = PaperForm(instance=paper, school=school)
         ctx = self._get_context(request)
-        return render(request, "papers/form.html", {"paper": paper, "form": form, **ctx})
+        template = "papers/_form_content.html" if request.headers.get("HX-Request") else "papers/form.html"
+        return render(request, template, {"paper": paper, "form": form, **ctx})
 
     def post(self, request, pk):
         if request.user.is_super_admin_role:
@@ -193,16 +211,23 @@ class PaperEditView(LoginRequiredMixin, View):
         if form.is_valid():
             subject = form.cleaned_data["subject"]
             if not request.user.is_super_admin_role and subject.school != request.user.school:
-                messages.error(request, "Subject not found.")
+                dj_messages.error(request, "Subject not found.")
+                if request.headers.get("HX-Request"):
+                    return HttpResponse("", headers=_htmx_messages(request))
                 return redirect("paper-list")
             if request.user.is_teacher_role and subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
+                if request.headers.get("HX-Request"):
+                    return HttpResponse("", headers=_htmx_messages(request))
                 return redirect("paper-list")
             form.save()
-            messages.success(request, "Paper updated!")
+            dj_messages.success(request, "Paper updated!")
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": f"/papers/{paper.pk}/"})
             return redirect("paper-detail", pk=paper.pk)
         ctx = self._get_context(request)
-        return render(request, "papers/form.html", {"paper": paper, "form": form, **ctx})
+        template = "papers/_form_content.html" if request.headers.get("HX-Request") else "papers/form.html"
+        return render(request, template, {"paper": paper, "form": form, **ctx}, headers=_htmx_messages(request))
 
 
 class PaperDeleteView(LoginRequiredMixin, View):
@@ -212,10 +237,12 @@ class PaperDeleteView(LoginRequiredMixin, View):
         else:
             paper = get_object_or_404(ExamPaper, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
         paper.delete()
-        messages.success(request, "Paper deleted.")
+        dj_messages.success(request, "Paper deleted.")
+        if request.headers.get("HX-Request"):
+            return HttpResponse("", headers=_htmx_messages(request))
         return redirect("paper-list")
 
 
@@ -226,7 +253,7 @@ class PaperAddQuestionView(LoginRequiredMixin, View):
         else:
             paper = get_object_or_404(ExamPaper, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
         question_id = request.POST.get("question_id")
         if request.user.is_super_admin_role:
@@ -239,7 +266,9 @@ class PaperAddQuestionView(LoginRequiredMixin, View):
         )
         question.times_used += 1
         question.save(update_fields=["times_used"])
-        messages.success(request, "Question added to paper.")
+        dj_messages.success(request, "Question added to paper.")
+        if request.headers.get("HX-Request"):
+            return PaperRemoveQuestionView()._render_detail(pk, request)
         return redirect("paper-detail", pk=paper.pk)
 
 
@@ -250,28 +279,53 @@ class PaperBulkAddView(LoginRequiredMixin, View):
         else:
             paper = get_object_or_404(ExamPaper, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
-        ids = request.POST.getlist("question_ids")
-        order = paper.paper_questions.count()
-        added = 0
-        for qid in ids:
-            try:
-                if request.user.is_super_admin_role:
-                    question = Question.objects.get(id=qid)
-                else:
-                    question = Question.objects.get(id=qid, school=request.user.school)
-                _, created = ExamPaperQuestion.objects.get_or_create(
-                    exam_paper=paper, question=question, defaults={"order": order + 1}
-                )
-                if created:
+        random_mode = request.POST.get("random")
+        if random_mode:
+            easy_count = int(request.POST.get("easy_count", 0) or 0)
+            medium_count = int(request.POST.get("medium_count", 0) or 0)
+            hard_count = int(request.POST.get("hard_count", 0) or 0)
+            existing_ids = ExamPaperQuestion.objects.filter(exam_paper=paper).values_list("question_id", flat=True)
+            order = paper.paper_questions.count()
+            added = 0
+            for diff, count in [("easy", easy_count), ("medium", medium_count), ("hard", hard_count)]:
+                if count <= 0:
+                    continue
+                qs = Question.objects.filter(
+                    school=paper.school, subject=paper.subject,
+                    status="published", difficulty=diff,
+                ).exclude(id__in=existing_ids).order_by("?")
+                for q in qs[:count]:
+                    ExamPaperQuestion.objects.create(exam_paper=paper, question=q, order=order + 1)
                     order += 1
+                    q.times_used += 1
+                    q.save(update_fields=["times_used"])
                     added += 1
-                    question.times_used += 1
-                    question.save(update_fields=["times_used"])
-            except Question.DoesNotExist:
-                continue
-        messages.success(request, f"Added {added} questions to paper.")
+            dj_messages.success(request, f"Added {added} random questions to paper.")
+        else:
+            ids = request.POST.getlist("question_ids")
+            order = paper.paper_questions.count()
+            added = 0
+            for qid in ids:
+                try:
+                    if request.user.is_super_admin_role:
+                        question = Question.objects.get(id=qid)
+                    else:
+                        question = Question.objects.get(id=qid, school=request.user.school)
+                    _, created = ExamPaperQuestion.objects.get_or_create(
+                        exam_paper=paper, question=question, defaults={"order": order + 1}
+                    )
+                    if created:
+                        order += 1
+                        added += 1
+                        question.times_used += 1
+                        question.save(update_fields=["times_used"])
+                except Question.DoesNotExist:
+                    continue
+            dj_messages.success(request, f"Added {added} questions to paper.")
+        if request.headers.get("HX-Request"):
+            return PaperRemoveQuestionView()._render_detail(pk, request)
         return redirect("paper-detail", pk=paper.pk)
 
 
@@ -282,11 +336,33 @@ class PaperRemoveQuestionView(LoginRequiredMixin, View):
         else:
             pq = get_object_or_404(ExamPaperQuestion, pk=pk, exam_paper__school=request.user.school)
             if request.user.is_teacher_role and pq.exam_paper.subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
         pq.delete()
-        messages.success(request, "Question removed from paper.")
+        dj_messages.success(request, "Question removed from paper.")
+        if request.headers.get("HX-Request"):
+            return self._render_detail(paper_pk, request)
         return redirect("paper-detail", pk=paper_pk)
+
+    def _render_detail(self, paper_pk, request):
+        """Re-render the paper detail page for HTMX."""
+        return render(request, "papers/_detail_content.html", self._get_context(paper_pk, request), headers=_htmx_messages(request))
+
+    def _get_context(self, paper_pk, request):
+        paper = get_object_or_404(ExamPaper, pk=paper_pk)
+        pqs = paper.paper_questions.select_related("question__topic").order_by("order")
+        if request.user.is_super_admin_role:
+            available_questions = Question.objects.filter(school=paper.school, subject=paper.subject, status="published").exclude(id__in=pqs.values_list("question_id", flat=True))
+            subjects = Subject.objects.all()
+        else:
+            available_questions = Question.objects.filter(school=request.user.school, subject=paper.subject, status="published").exclude(id__in=pqs.values_list("question_id", flat=True))
+            if request.user.is_teacher_role:
+                available_questions = available_questions.filter(subject__in=request.user.subjects.all())
+            if request.user.is_school_admin_role:
+                subjects = Subject.objects.filter(school=request.user.school)
+            else:
+                subjects = request.user.subjects.filter(school=request.user.school)
+        return {"paper": paper, "paper_questions": pqs, "available_questions": available_questions, "subjects": subjects}
 
 
 class PaperAutoFillView(LoginRequiredMixin, View):
@@ -303,7 +379,7 @@ class PaperAutoFillView(LoginRequiredMixin, View):
         else:
             paper = get_object_or_404(ExamPaper, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
         easy = self._safe_int(request.POST.get("easy", 0))
         medium = self._safe_int(request.POST.get("medium", 0))
@@ -324,7 +400,9 @@ class PaperAutoFillView(LoginRequiredMixin, View):
                 q.times_used += 1
                 q.save(update_fields=["times_used"])
                 added += 1
-        messages.success(request, f"Auto-filled {added} questions.")
+        dj_messages.success(request, f"Auto-filled {added} questions.")
+        if request.headers.get("HX-Request"):
+            return PaperRemoveQuestionView()._render_detail(pk, request)
         return redirect("paper-detail", pk=paper.pk)
 
 
@@ -335,14 +413,16 @@ class PaperReorderView(LoginRequiredMixin, View):
         else:
             paper = get_object_or_404(ExamPaper, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
         for pq in paper.paper_questions.all():
             new_order = request.POST.get(f"order_{pq.pk}")
             if new_order is not None:
                 pq.order = int(new_order)
                 pq.save(update_fields=["order"])
-        messages.success(request, "Questions reordered.")
+        dj_messages.success(request, "Questions reordered.")
+        if request.headers.get("HX-Request"):
+            return PaperRemoveQuestionView()._render_detail(pk, request)
         return redirect("paper-detail", pk=paper.pk)
 
 
@@ -353,7 +433,7 @@ class PaperExportPdfView(LoginRequiredMixin, View):
         else:
             paper = get_object_or_404(ExamPaper, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
         from .export import generate_paper_pdf
         return generate_paper_pdf(paper)
@@ -366,7 +446,7 @@ class PaperExportDocxView(LoginRequiredMixin, View):
         else:
             paper = get_object_or_404(ExamPaper, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
         from .export import generate_paper_docx
         return generate_paper_docx(paper)
@@ -379,7 +459,7 @@ class PaperPrintView(LoginRequiredMixin, View):
         else:
             paper = get_object_or_404(ExamPaper, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and paper.subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("paper-list")
         from .export import generate_paper_html
         return generate_paper_html(paper)

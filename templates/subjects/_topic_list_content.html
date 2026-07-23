@@ -1,0 +1,103 @@
+{% load question_tags %}
+<div id="list-content">
+    <div class="space-y-5">
+        <form method="get" action="{% url 'topic-list' %}" class="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div class="relative flex-1">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    <input name="q" type="text" value="{{ q }}" placeholder="Search topics..."
+                           hx-get="{% url 'topic-list' %}" hx-trigger="keyup changed delay:300ms" hx-target="#list-content" hx-swap="innerHTML" hx-include="closest form" hx-push-url="true"
+                           class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-gray-50 focus:bg-white transition-colors">
+                </div>
+                <select name="subject"
+                        hx-get="{% url 'topic-list' %}" hx-trigger="change" hx-target="#list-content" hx-swap="innerHTML" hx-include="closest form" hx-push-url="true"
+                        class="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 focus:bg-white transition-colors">
+                    <option value="">All Subjects</option>
+                    {% for s in all_subjects %}
+                    <option value="{{ s.pk }}" {% if subject_filter == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>
+                    {% endfor %}
+                </select>
+                <select name="class_level"
+                        hx-get="{% url 'topic-list' %}" hx-trigger="change" hx-target="#list-content" hx-swap="innerHTML" hx-include="closest form" hx-push-url="true"
+                        class="px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:ring-2 focus:ring-primary-500 focus:bg-white transition-colors">
+                    <option value="">All Class Levels</option>
+                    {% for cl in class_levels %}
+                    <option value="{{ cl.pk }}" {% if class_level_filter == cl.pk|stringformat:"s" %}selected{% endif %}>{{ cl.name }}</option>
+                    {% endfor %}
+                </select>
+                {% if q or subject_filter or class_level_filter %}<a href="{% url 'topic-list' %}" class="px-4 py-2.5 text-sm text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-all duration-200">Clear</a>{% endif %}
+            </div>
+        </form>
+
+        {% if topics %}
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-100">
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Topic</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Subject</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden md:table-cell">Questions</th>
+                            <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Created</th>
+                            <th class="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        {% for topic in topics %}
+                        <tr class="hover:bg-gray-50/50 transition-colors group">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-sm">
+                                        <span class="text-white font-bold text-xs">{{ topic.name|first }}</span>
+                                    </div>
+                                    <span class="font-semibold text-gray-900 group-hover:text-primary-700 transition-colors">{{ topic.name }}</span>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-gray-100 text-gray-600 border border-gray-200">{{ topic.subject.name }}</span>
+                            </td>
+                            <td class="px-6 py-4 hidden md:table-cell">
+                                <span class="text-sm font-semibold text-gray-700">{{ topic.question_count|default:"0" }}</span>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-400 hidden lg:table-cell">{{ topic.created_at|timesince }} ago</td>
+                            <td class="px-4 sm:px-6 py-4 text-right">
+                                <div class="flex items-center justify-end gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-200">
+                                    <a href="{% url 'topic-edit' topic.pk %}" class="p-2 text-gray-400 hover:text-primary-600 rounded-xl hover:bg-primary-50 transition-all duration-200" title="Edit">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                    </a>
+                                    <form method="post" action="{% url 'topic-delete' topic.pk %}" class="inline"
+                                          hx-post="{% url 'topic-delete' topic.pk %}" hx-target="closest tr" hx-swap="outerHTML swap:300ms"
+                                          hx-confirm="Delete {{ topic.name }}?">
+                                        {% csrf_token %}
+                                        <button class="p-2 text-gray-400 hover:text-red-600 rounded-xl hover:bg-red-50 transition-all duration-200" title="Delete">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% include "includes/pagination.html" %}
+        </div>
+        {% else %}
+        <div class="text-center py-20 bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <div class="w-16 h-16 mx-auto rounded-2xl bg-gray-100 flex items-center justify-center mb-4">
+                <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-900">No topics found</h3>
+            <p class="mt-2 text-sm text-gray-500 max-w-sm mx-auto">
+                {% if q or subject_filter %}Try adjusting your search or <a href="{% url 'topic-list' %}" class="text-primary-600 hover:text-primary-700 font-medium">clear filters</a> to see all topics.{% else %}Create your first topic to organize questions under subjects.{% endif %}
+            </p>
+            {% if not q and not subject_filter %}
+            <a href="{% url 'topic-create' %}" class="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-500 text-white text-sm font-semibold rounded-xl hover:from-primary-700 hover:to-primary-600 shadow-lg shadow-primary-500/25 transition-all duration-200">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Create Topic
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>

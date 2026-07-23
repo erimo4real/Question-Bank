@@ -1,8 +1,10 @@
-from django.contrib import messages
+import json
+
+from django.contrib import messages as dj_messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import Count
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from rest_framework import viewsets
@@ -13,6 +15,11 @@ from apps.schools.models import ClassLevel, School
 from .forms import SubjectForm, TopicCreateForm, TopicForm
 from .models import Subject, Topic
 from .serializers import SubjectDetailSerializer, SubjectSerializer, TopicSerializer
+
+
+def _htmx_messages(request):
+    msgs = [{"text": str(m), "tag": m.tags} for m in dj_messages.get_messages(request)]
+    return {"X-Messages": json.dumps(msgs)}
 
 
 def generate_subject_code(name, school):
@@ -56,10 +63,12 @@ class SubjectListView(LoginRequiredMixin, View):
         else:
             class_levels = ClassLevel.objects.filter(school=request.user.school)
 
-        return render(request, "subjects/list.html", {
+        ctx = {
             "subjects": page_obj, "page_obj": page_obj, "q": q,
             "class_level_filter": class_level_filter, "class_levels": class_levels,
-        })
+        }
+        template = "subjects/_list_content.html" if request.headers.get("HX-Request") else "subjects/list.html"
+        return render(request, template, ctx)
 
 
 class SubjectCreateView(LoginRequiredMixin, View):
@@ -67,25 +76,30 @@ class SubjectCreateView(LoginRequiredMixin, View):
         school = self._get_school(request)
         form = SubjectForm(school=school)
         class_levels = ClassLevel.objects.filter(school=school) if school else ClassLevel.objects.all()
-        return render(request, "subjects/form.html", {"subject": None, "form": form, "class_levels": class_levels})
+        template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
+        return render(request, template, {"subject": None, "form": form, "class_levels": class_levels})
 
     def post(self, request):
         school = self._get_school(request)
         form = SubjectForm(request.POST, school=school)
         if form.is_valid():
             if not school:
-                messages.error(request, "No school assigned to your account.")
-                return render(request, "subjects/form.html", {"subject": None, "form": form})
+                dj_messages.error(request, "No school assigned to your account.")
+                template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
+                return render(request, template, {"subject": None, "form": form, "class_levels": ClassLevel.objects.all()}, headers=_htmx_messages(request))
             subject = form.save(commit=False)
             subject.school = school
             subject.created_by = request.user
             if not subject.code:
                 subject.code = generate_subject_code(subject.name, school)
             subject.save()
-            messages.success(request, f'Subject "{subject.name}" created.')
+            dj_messages.success(request, f'Subject "{subject.name}" created.')
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/subjects/"})
             return redirect("subject-list")
         class_levels = ClassLevel.objects.filter(school=school) if school else ClassLevel.objects.all()
-        return render(request, "subjects/form.html", {"subject": None, "form": form, "class_levels": class_levels})
+        template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
+        return render(request, template, {"subject": None, "form": form, "class_levels": class_levels}, headers=_htmx_messages(request))
 
     def _get_school(self, request):
         if request.user.is_super_admin_role:
@@ -106,7 +120,8 @@ class SubjectEditView(LoginRequiredMixin, View):
             school = request.user.school
         form = SubjectForm(instance=subject, school=school)
         class_levels = ClassLevel.objects.filter(school=school) if school else ClassLevel.objects.all()
-        return render(request, "subjects/form.html", {"subject": subject, "form": form, "class_levels": class_levels})
+        template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
+        return render(request, template, {"subject": subject, "form": form, "class_levels": class_levels})
 
     def post(self, request, pk):
         if request.user.is_super_admin_role:
@@ -121,10 +136,13 @@ class SubjectEditView(LoginRequiredMixin, View):
             if not updated.code:
                 updated.code = generate_subject_code(updated.name, updated.school)
             updated.save()
-            messages.success(request, f'Subject "{updated.name}" updated.')
+            dj_messages.success(request, f'Subject "{updated.name}" updated.')
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/subjects/"})
             return redirect("subject-list")
         class_levels = ClassLevel.objects.filter(school=school) if school else ClassLevel.objects.all()
-        return render(request, "subjects/form.html", {"subject": subject, "form": form, "class_levels": class_levels})
+        template = "subjects/_form_content.html" if request.headers.get("HX-Request") else "subjects/form.html"
+        return render(request, template, {"subject": subject, "form": form, "class_levels": class_levels}, headers=_htmx_messages(request))
 
 
 class SubjectDeleteView(LoginRequiredMixin, View):
@@ -135,7 +153,9 @@ class SubjectDeleteView(LoginRequiredMixin, View):
             subject = get_object_or_404(Subject, pk=pk, school=request.user.school)
         name = subject.name
         subject.delete()
-        messages.success(request, f'Subject "{name}" deleted.')
+        dj_messages.success(request, f'Subject "{name}" deleted.')
+        if request.headers.get("HX-Request"):
+            return HttpResponse("", headers=_htmx_messages(request))
         return redirect("subject-list")
 
 
@@ -191,11 +211,13 @@ class TopicListView(LoginRequiredMixin, View):
             all_subjects = request.user.subjects.filter(school=request.user.school)
             class_levels = ClassLevel.objects.filter(school=request.user.school)
 
-        return render(request, "subjects/topic_list.html", {
+        ctx = {
             "topics": page_obj, "page_obj": page_obj, "q": q, "subject_filter": subject_filter,
             "class_level_filter": class_level_filter, "class_levels": class_levels,
             "all_subjects": all_subjects,
-        })
+        }
+        template = "subjects/_topic_list_content.html" if request.headers.get("HX-Request") else "subjects/topic_list.html"
+        return render(request, template, ctx)
 
 
 class TopicCreateStandaloneView(LoginRequiredMixin, View):
@@ -207,28 +229,32 @@ class TopicCreateStandaloneView(LoginRequiredMixin, View):
             subjects = Subject.objects.filter(school=request.user.school).order_by("name")
             class_levels = ClassLevel.objects.filter(school=request.user.school)
         form = TopicCreateForm()
-        return render(request, "subjects/topic_form.html", {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form})
+        template = "subjects/_topic_form_content.html" if request.headers.get("HX-Request") else "subjects/topic_form.html"
+        return render(request, template, {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form})
 
     def post(self, request):
         if request.user.is_super_admin_role:
             class_levels = ClassLevel.objects.all()
+            subjects = Subject.objects.all().order_by("name")
         else:
             class_levels = ClassLevel.objects.filter(school=request.user.school)
+            subjects = Subject.objects.filter(school=request.user.school).order_by("name")
         form = TopicCreateForm(request.POST)
         if form.is_valid():
             subject = form.cleaned_data["subject"]
             if not request.user.is_super_admin_role:
                 if subject.school != request.user.school:
-                    messages.error(request, "Subject not found.")
+                    dj_messages.error(request, "Subject not found.")
+                    if request.headers.get("HX-Request"):
+                        return render("subjects/_topic_form_content.html", {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
                     return redirect("topic-create")
             topic = form.save()
-            messages.success(request, f'Topic "{topic.name}" created under {subject.name}.')
+            dj_messages.success(request, f'Topic "{topic.name}" created under {subject.name}.')
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/topics/"})
             return redirect("topic-list")
-        if request.user.is_super_admin_role:
-            subjects = Subject.objects.all().order_by("name")
-        else:
-            subjects = Subject.objects.filter(school=request.user.school).order_by("name")
-        return render(request, "subjects/topic_form.html", {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form})
+        template = "subjects/_topic_form_content.html" if request.headers.get("HX-Request") else "subjects/topic_form.html"
+        return render(request, template, {"topic": None, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
 
 
 class TopicEditView(LoginRequiredMixin, View):
@@ -242,29 +268,33 @@ class TopicEditView(LoginRequiredMixin, View):
             subjects = Subject.objects.filter(school=request.user.school).order_by("name")
             class_levels = ClassLevel.objects.filter(school=request.user.school)
         form = TopicCreateForm(instance=topic)
-        return render(request, "subjects/topic_form.html", {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form})
+        template = "subjects/_topic_form_content.html" if request.headers.get("HX-Request") else "subjects/topic_form.html"
+        return render(request, template, {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form})
 
     def post(self, request, pk):
         if request.user.is_super_admin_role:
             topic = get_object_or_404(Topic, pk=pk)
             class_levels = ClassLevel.objects.all()
+            subjects = Subject.objects.all().order_by("name")
         else:
             topic = get_object_or_404(Topic, pk=pk, subject__school=request.user.school)
             class_levels = ClassLevel.objects.filter(school=request.user.school)
+            subjects = Subject.objects.filter(school=request.user.school).order_by("name")
         form = TopicCreateForm(request.POST, instance=topic)
         if form.is_valid():
             subject = form.cleaned_data["subject"]
             if not request.user.is_super_admin_role and subject.school != request.user.school:
-                messages.error(request, "Subject not found.")
+                dj_messages.error(request, "Subject not found.")
+                if request.headers.get("HX-Request"):
+                    return render("subjects/_topic_form_content.html", {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
                 return redirect("topic-list")
             form.save()
-            messages.success(request, f'Topic "{topic.name}" updated.')
+            dj_messages.success(request, f'Topic "{topic.name}" updated.')
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/topics/"})
             return redirect("topic-list")
-        if request.user.is_super_admin_role:
-            subjects = Subject.objects.all().order_by("name")
-        else:
-            subjects = Subject.objects.filter(school=request.user.school).order_by("name")
-        return render(request, "subjects/topic_form.html", {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form})
+        template = "subjects/_topic_form_content.html" if request.headers.get("HX-Request") else "subjects/topic_form.html"
+        return render(request, template, {"topic": topic, "subjects": subjects, "class_levels": class_levels, "form": form}, headers=_htmx_messages(request))
 
 
 class TopicDeleteStandaloneView(LoginRequiredMixin, View):
@@ -275,7 +305,9 @@ class TopicDeleteStandaloneView(LoginRequiredMixin, View):
             topic = get_object_or_404(Topic, pk=pk, subject__school=request.user.school)
         name = topic.name
         topic.delete()
-        messages.success(request, f'Topic "{name}" deleted.')
+        dj_messages.success(request, f'Topic "{name}" deleted.')
+        if request.headers.get("HX-Request"):
+            return HttpResponse("", headers=_htmx_messages(request))
         return redirect("topic-list")
 
 
@@ -288,7 +320,10 @@ class TopicCreateView(LoginRequiredMixin, View):
         name = request.POST.get("name", "").strip()
         if name:
             Topic.objects.create(name=name, subject=subject)
-            messages.success(request, f'Topic "{name}" added to {subject.name}.')
+            dj_messages.success(request, f'Topic "{name}" added to {subject.name}.')
+        if request.headers.get("HX-Request"):
+            topics = subject.topics.all()
+            return render(request, "subjects/_topic_tags.html", {"subject": subject, "topics": topics}, headers=_htmx_messages(request))
         return redirect("subject-list")
 
 
@@ -298,8 +333,12 @@ class TopicDeleteView(LoginRequiredMixin, View):
             topic = get_object_or_404(Topic.objects.filter(subject_id=subject_pk), pk=pk)
         else:
             topic = get_object_or_404(Topic.objects.filter(subject__school=request.user.school), pk=pk, subject_id=subject_pk)
+        subject = topic.subject
         topic.delete()
-        messages.success(request, "Topic deleted.")
+        dj_messages.success(request, "Topic deleted.")
+        if request.headers.get("HX-Request"):
+            topics = subject.topics.all()
+            return render(request, "subjects/_topic_tags.html", {"subject": subject, "topics": topics}, headers=_htmx_messages(request))
         return redirect("subject-list")
 
 

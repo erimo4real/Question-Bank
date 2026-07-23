@@ -2,7 +2,7 @@ import csv
 import io
 import json
 
-from django.contrib import messages
+from django.contrib import messages as dj_messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
@@ -25,6 +25,11 @@ from .serializers import (
     QuestionPreviewSerializer,
     QuestionSerializer,
 )
+
+
+def _htmx_messages(request):
+    msgs = [{"text": str(m), "tag": m.tags} for m in dj_messages.get_messages(request)]
+    return {"X-Messages": json.dumps(msgs)}
 
 
 # ─── Template Views ───────────────────────────────────────────────
@@ -90,7 +95,7 @@ class QuestionListView(LoginRequiredMixin, View):
         except EmptyPage:
             page_obj = paginator_obj.page(paginator_obj.num_pages)
 
-        return render(request, "questions/list.html", {
+        ctx = {
             "questions": page_obj,
             "page_obj": page_obj,
             "subjects": subjects,
@@ -102,7 +107,9 @@ class QuestionListView(LoginRequiredMixin, View):
             "published_count": published_count,
             "draft_count": draft_count,
             "paginator": paginator_obj,
-        })
+        }
+        template = "questions/_list_content.html" if request.headers.get("HX-Request") else "questions/list.html"
+        return render(request, template, ctx)
 
 
 class QuestionCreateView(LoginRequiredMixin, View):
@@ -131,7 +138,8 @@ class QuestionCreateView(LoginRequiredMixin, View):
         ctx = self._get_context(request)
         school = self._get_school(request)
         form = QuestionForm(school=school)
-        return render(request, "questions/form.html", {
+        template = "questions/_form_content.html" if request.headers.get("HX-Request") else "questions/form.html"
+        return render(request, template, {
             "question": None, "form": form, **ctx,
             "type_choices": Question.TYPE_CHOICES,
             "difficulty_choices": Question.DIFFICULTY_CHOICES,
@@ -143,10 +151,14 @@ class QuestionCreateView(LoginRequiredMixin, View):
         if form.is_valid():
             subject = form.cleaned_data["subject"]
             if not request.user.is_super_admin_role and subject.school != request.user.school:
-                messages.error(request, "Subject not found.")
+                dj_messages.error(request, "Subject not found.")
+                if request.headers.get("HX-Request"):
+                    return HttpResponse("", headers=_htmx_messages(request))
                 return redirect("question-create")
             if request.user.is_teacher_role and subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
+                if request.headers.get("HX-Request"):
+                    return HttpResponse("", headers=_htmx_messages(request))
                 return redirect("question-create")
             options = [o.strip() for o in request.POST.getlist("options") if o.strip()]
             correct_answer = [a.strip() for a in request.POST.getlist("correct_answer") if a.strip()]
@@ -158,14 +170,17 @@ class QuestionCreateView(LoginRequiredMixin, View):
             q.school = subject.school
             q.created_by = request.user
             q.save()
-            messages.success(request, "Question created successfully!")
+            dj_messages.success(request, "Question created successfully!")
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": f"/questions/{q.pk}/edit/"})
             return redirect("question-edit", pk=q.pk)
         ctx = self._get_context(request)
-        return render(request, "questions/form.html", {
+        template = "questions/_form_content.html" if request.headers.get("HX-Request") else "questions/form.html"
+        return render(request, template, {
             "question": None, "form": form, **ctx,
             "type_choices": Question.TYPE_CHOICES,
             "difficulty_choices": Question.DIFFICULTY_CHOICES,
-        })
+        }, headers=_htmx_messages(request))
 
 
 class QuestionEditView(LoginRequiredMixin, View):
@@ -196,12 +211,13 @@ class QuestionEditView(LoginRequiredMixin, View):
         else:
             question = get_object_or_404(Question, pk=pk, school=request.user.school)
             if request.user.is_teacher_role and question.subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
                 return redirect("question-list")
         school = self._get_school(request)
         form = QuestionForm(instance=question, initial={"tags_input": ", ".join(question.tags or [])}, school=school)
         ctx = self._get_context(request)
-        return render(request, "questions/form.html", {
+        template = "questions/_form_content.html" if request.headers.get("HX-Request") else "questions/form.html"
+        return render(request, template, {
             "question": question, "form": form, **ctx,
             "type_choices": Question.TYPE_CHOICES,
             "difficulty_choices": Question.DIFFICULTY_CHOICES,
@@ -217,10 +233,14 @@ class QuestionEditView(LoginRequiredMixin, View):
         if form.is_valid():
             subject = form.cleaned_data["subject"]
             if not request.user.is_super_admin_role and subject.school != request.user.school:
-                messages.error(request, "Subject not found.")
+                dj_messages.error(request, "Subject not found.")
+                if request.headers.get("HX-Request"):
+                    return HttpResponse("", headers=_htmx_messages(request))
                 return redirect("question-list")
             if request.user.is_teacher_role and subject not in request.user.subjects.all():
-                messages.error(request, "You are not assigned to this subject.")
+                dj_messages.error(request, "You are not assigned to this subject.")
+                if request.headers.get("HX-Request"):
+                    return HttpResponse("", headers=_htmx_messages(request))
                 return redirect("question-list")
             options = [o.strip() for o in request.POST.getlist("options") if o.strip()]
             correct_answer = [a.strip() for a in request.POST.getlist("correct_answer") if a.strip()]
@@ -230,14 +250,17 @@ class QuestionEditView(LoginRequiredMixin, View):
             q.correct_answer = correct_answer
             q.tags = tags
             q.save()
-            messages.success(request, "Question updated!")
+            dj_messages.success(request, "Question updated!")
+            if request.headers.get("HX-Request"):
+                return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": f"/questions/{question.pk}/edit/"})
             return redirect("question-edit", pk=question.pk)
         ctx = self._get_context(request)
-        return render(request, "questions/form.html", {
+        template = "questions/_form_content.html" if request.headers.get("HX-Request") else "questions/form.html"
+        return render(request, template, {
             "question": question, "form": form, **ctx,
             "type_choices": Question.TYPE_CHOICES,
             "difficulty_choices": Question.DIFFICULTY_CHOICES,
-        })
+        }, headers=_htmx_messages(request))
 
 
 class QuestionDeleteView(LoginRequiredMixin, View):
@@ -247,7 +270,9 @@ class QuestionDeleteView(LoginRequiredMixin, View):
         else:
             question = get_object_or_404(Question, pk=pk, school=request.user.school)
         question.delete()
-        messages.success(request, "Question deleted.")
+        dj_messages.success(request, "Question deleted.")
+        if request.headers.get("HX-Request"):
+            return HttpResponse("", headers=_htmx_messages(request))
         return redirect("question-list")
 
 
@@ -262,19 +287,24 @@ class QuestionPreviewView(LoginRequiredMixin, View):
 
 class QuestionImportView(LoginRequiredMixin, View):
     def get(self, request):
-        return render(request, "questions/import.html")
+        template = "questions/_import_content.html" if request.headers.get("HX-Request") else "questions/import.html"
+        return render(request, template)
 
     def post(self, request):
         file = request.FILES.get("file")
         if not file:
-            messages.error(request, "No file provided.")
+            dj_messages.error(request, "No file provided.")
+            if request.headers.get("HX-Request"):
+                return render(request, "questions/_import_content.html", headers=_htmx_messages(request))
             return redirect("question-import")
 
         try:
             decoded = file.read().decode("utf-8")
             reader = csv.DictReader(io.StringIO(decoded))
         except Exception:
-            messages.error(request, "Invalid CSV file.")
+            dj_messages.error(request, "Invalid CSV file.")
+            if request.headers.get("HX-Request"):
+                return render(request, "questions/_import_content.html", headers=_htmx_messages(request))
             return redirect("question-import")
 
         created = 0
@@ -303,7 +333,7 @@ class QuestionImportView(LoginRequiredMixin, View):
                     else:
                         subject = Subject.objects.get(pk=subject_id, school=request.user.school)
                 if not subject:
-                    messages.error(request, f"Row {i}: subject not found. Import stopped.")
+                    dj_messages.error(request, f"Row {i}: subject not found. Import stopped.")
                     break
 
                 Question.objects.create(
@@ -325,9 +355,11 @@ class QuestionImportView(LoginRequiredMixin, View):
                 errors.append(f"Row {i}: {str(e)}")
 
         if created:
-            messages.success(request, f"Imported {created} questions.")
+            dj_messages.success(request, f"Imported {created} questions.")
         if errors:
-            messages.warning(request, f"{len(errors)} errors: {'; '.join(errors[:5])}")
+            dj_messages.warning(request, f"{len(errors)} errors: {'; '.join(errors[:5])}")
+        if request.headers.get("HX-Request"):
+            return HttpResponse("", headers={**_htmx_messages(request), "HX-Redirect": "/questions/"})
         return redirect("question-list")
 
 
@@ -338,8 +370,67 @@ class QuestionBulkDeleteView(LoginRequiredMixin, View):
             deleted, _ = Question.objects.filter(id__in=ids).delete()
         else:
             deleted, _ = Question.objects.filter(id__in=ids, school=request.user.school).delete()
-        messages.success(request, f"Deleted {deleted} questions.")
+        dj_messages.success(request, f"Deleted {deleted} questions.")
+        if request.headers.get("HX-Request"):
+            return self._render_list(request)
         return redirect("question-list")
+
+    def _render_list(self, request):
+        """Re-render the questions list partial."""
+        from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+        from apps.subjects.models import Subject
+        if request.user.is_super_admin_role:
+            qs = Question.objects.all().select_related("subject", "topic").order_by("-created_at")
+            subjects = Subject.objects.all()
+            class_levels = ClassLevel.objects.all()
+        elif request.user.is_school_admin_role:
+            qs = Question.objects.filter(school=request.user.school).select_related("subject", "topic").order_by("-created_at")
+            subjects = Subject.objects.filter(school=request.user.school)
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
+        else:
+            qs = Question.objects.filter(school=request.user.school).select_related("subject", "topic").order_by("-created_at")
+            qs = qs.filter(subject__in=request.user.subjects.all())
+            subjects = request.user.subjects.filter(school=request.user.school)
+            class_levels = ClassLevel.objects.filter(school=request.user.school)
+        q = request.GET.get("q", "")
+        q_type = request.GET.get("type", "")
+        difficulty = request.GET.get("difficulty", "")
+        status_filter = request.GET.get("status", "")
+        subject = request.GET.get("subject", "")
+        class_level_filter = request.GET.get("class_level", "")
+        if q:
+            search_query = SearchQuery(q)
+            qs = qs.filter(Q(search_vector=search_query) | Q(question_text__icontains=q) | Q(explanation__icontains=q)).annotate(rank=SearchRank("search_vector", search_query)).order_by("-rank")
+        if q_type:
+            qs = qs.filter(question_type=q_type)
+        if difficulty:
+            qs = qs.filter(difficulty=difficulty)
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        if subject:
+            qs = qs.filter(subject_id=subject)
+        if class_level_filter:
+            qs = qs.filter(class_level_id=class_level_filter)
+        published_count = qs.filter(status="published").count()
+        draft_count = qs.filter(status="draft").count()
+        paginator_obj = Paginator(qs, 20)
+        page = request.GET.get("page")
+        try:
+            page_obj = paginator_obj.page(page)
+        except PageNotAnInteger:
+            page_obj = paginator_obj.page(1)
+        except EmptyPage:
+            page_obj = paginator_obj.page(paginator_obj.num_pages)
+        ctx = {
+            "questions": page_obj, "page_obj": page_obj, "subjects": subjects,
+            "class_levels": class_levels,
+            "filters": {"q": q, "type": q_type, "difficulty": difficulty, "status": status_filter, "subject": subject, "class_level": class_level_filter},
+            "type_choices": Question.TYPE_CHOICES,
+            "difficulty_choices": Question.DIFFICULTY_CHOICES,
+            "status_choices": Question.STATUS_CHOICES,
+            "published_count": published_count, "draft_count": draft_count, "paginator": paginator_obj,
+        }
+        return render(request, "questions/_list_content.html", ctx, headers=_htmx_messages(request))
 
 
 class QuestionBulkStatusView(LoginRequiredMixin, View):
@@ -350,7 +441,9 @@ class QuestionBulkStatusView(LoginRequiredMixin, View):
             updated = Question.objects.filter(id__in=ids).update(status=new_status)
         else:
             updated = Question.objects.filter(id__in=ids, school=request.user.school).update(status=new_status)
-        messages.success(request, f"Updated {updated} questions to {new_status}.")
+        dj_messages.success(request, f"Updated {updated} questions to {new_status}.")
+        if request.headers.get("HX-Request"):
+            return QuestionBulkDeleteView()._render_list(request)
         return redirect("question-list")
 
 
