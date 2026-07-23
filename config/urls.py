@@ -17,6 +17,9 @@ urlpatterns = [
     path("api/auth/", include("apps.accounts.urls")),
     path("api/schools/", include("apps.schools.urls")),
     path("api/subjects/", include("apps.subjects.urls")),
+    # Redirect /api/questions/api/ → /api/questions/ (and same for papers)
+    path("api/questions/api/", lambda r: redirect("/api/questions/")),
+    path("api/papers/api/", lambda r: redirect("/api/papers/")),
     path("api/questions/", include("apps.questions.urls")),
     path("api/papers/", include("apps.papers.urls")),
     path("api/dashboard/", include("apps.dashboard.urls")),
